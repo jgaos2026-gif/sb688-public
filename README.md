@@ -18,4 +18,5 @@ This repository now includes the core governance documents for a fully autonomou
 
 ## Repository Purpose
 
-This repository (`sb688-public`) is dedicated to public-facing information regarding the sb688 project. It **contains no proprietary algorithms, source code, or intellectual property**.
+This repository (`sb688-public`) is dedicated to public-facing information regarding the sb688 project. It **con
+tains no proprietary algorithms, source code, or intellectual property**.
