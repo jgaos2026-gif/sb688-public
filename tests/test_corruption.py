@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import time
 
+import pytest
+
 from kernel.SB688_ENGINE import SB688Engine
 from kernel.VERA_GATE_RUNTIME import VERAGate, VeraBlockedError
 
@@ -58,12 +60,8 @@ def test_vera_blocks_unsafe_commit() -> None:
 
     engine.inject_corruption(percent=75)
 
-    try:
+    with pytest.raises(VeraBlockedError):
         vera.can_commit_state(engine.get_state())
-    except VeraBlockedError:
-        pass
-    else:
-        raise AssertionError("Expected VeraBlockedError for unsafe commit")
 
     for _ in engine.heal_from_spine():
         pass

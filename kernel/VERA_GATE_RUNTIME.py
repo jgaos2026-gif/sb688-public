@@ -23,6 +23,9 @@ class VERAGate:
     def scan_for_anomalies(self, engine: Any) -> list[Anomaly]:
         anomalies: list[Anomaly] = []
         for brick_id, brick in engine.bricks.items():
+            if brick.state == "corrupted":
+                anomalies.append(Anomaly(brick_id=brick_id, reason="brick marked corrupted"))
+                continue
             if not self.verify_brick_state(brick):
                 anomalies.append(Anomaly(brick_id=brick_id, reason="brick checksum/state mismatch"))
         return anomalies
@@ -39,9 +42,7 @@ class VERAGate:
     def verify_ledger_chain(ledger: list[dict[str, Any]]) -> bool:
         from kernel.LEDGER_STORE import LedgerStore
 
-        verifier = LedgerStore()
-        verifier._entries = ledger  # type: ignore[attr-defined]
-        return verifier.verify_chain()
+        return LedgerStore.verify_chain_for_entries(ledger)
 
     def can_commit_state(self, new_state: dict[str, Any]) -> bool:
         health = float(new_state.get("health", 0.0))

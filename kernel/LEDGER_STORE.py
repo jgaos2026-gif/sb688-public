@@ -42,21 +42,24 @@ class LedgerStore:
         return deepcopy(self._entries)
 
     def verify_chain(self) -> bool:
+        return self.verify_chain_for_entries(self._entries)
+
+    @classmethod
+    def verify_chain_for_entries(cls, entries: list[dict[str, Any]]) -> bool:
         prev = "GENESIS"
-        for entry in self._entries:
+        for entry in entries:
             if entry.get("previous_hash") != prev:
                 return False
-            if entry.get("entry_hash") != self._entry_digest(entry):
+            if entry.get("entry_hash") != cls._entry_digest(entry):
                 return False
             prev = entry["entry_hash"]
         return True
 
     def get_checkpoint(self, timestamp: str) -> dict[str, Any] | None:
-        checkpoint = None
-        for entry in self._entries:
+        for entry in reversed(self._entries):
             if entry["timestamp"] <= timestamp and entry.get("event_type") == "CHECKPOINT_SAVED":
-                checkpoint = deepcopy(entry.get("data", {}).get("checkpoint"))
-        return checkpoint
+                return deepcopy(entry.get("data", {}).get("checkpoint"))
+        return None
 
     def export_json(self) -> str:
         return json.dumps(self._entries, indent=2, sort_keys=True)

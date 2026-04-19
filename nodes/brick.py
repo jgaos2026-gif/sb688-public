@@ -35,7 +35,11 @@ class Brick:
         self.timestamp = time.time()
 
     def verify(self) -> bool:
-        return self.state in {"operational", "corrupted", "healing"} and self.checksum() == self._checksum
+        if self.state not in {"operational", "corrupted", "healing"}:
+            return False
+        if self.state == "corrupted":
+            return self.checksum() != self._checksum
+        return self.checksum() == self._checksum
 
     def get_data(self) -> bytes:
         return self._data

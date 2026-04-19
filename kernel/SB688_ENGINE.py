@@ -96,14 +96,17 @@ class SB688Engine:
             return "HEALING"
         return "RED"
 
+    def set_braid_paths(self, path_a: str, path_b: str) -> None:
+        self._braid_a = path_a
+        self._braid_b = path_b
+
     def inject_corruption(self, percent: float = 99.8) -> None:
         self._save_checkpoint()
         self._corruption_seed += 1
         rng = random.Random(int(percent * 1000) + self._corruption_seed)
         count = min(self.TOTAL_BRICKS, max(0, math.ceil(self.TOTAL_BRICKS * (percent / 100.0))))
         selected = sorted(rng.sample(list(self.bricks.keys()), count)) if count else []
-        self._braid_a = "RED"
-        self._braid_b = "RED"
+        self.set_braid_paths("RED", "RED")
         self._log("CORRUPT", "CORRUPTION_START", f"Injecting corruption into {count} bricks", {"percent": percent})
         for brick_id in selected:
             self.bricks[brick_id].corrupt()
@@ -130,8 +133,7 @@ class SB688Engine:
         for brick_id in range(self.TOTAL_BRICKS):
             data = bytes.fromhex(chosen["bricks"][brick_id]["data"])
             self.bricks[brick_id].set_data(data)
-        self._braid_a = "HEALING"
-        self._braid_b = "HEALING"
+        self.set_braid_paths("HEALING", "HEALING")
         self._log("ROLLBACK", "ROLLBACK_CHECKPOINT", "Rollback to checkpoint complete", {"timestamp": timestamp})
         return True
 
@@ -153,8 +155,7 @@ class SB688Engine:
             yield HealEvent(self._now(), "HEAL", f"Brick {brick_id} healed", {"brick_id": brick_id})
 
         integrity = self.verify_integrity()
-        self._braid_a = "GREEN" if integrity else "RED"
-        self._braid_b = "GREEN" if integrity else "RED"
+        self.set_braid_paths("GREEN" if integrity else "RED", "GREEN" if integrity else "RED")
         self._log("VERIFY", "INTEGRITY_CHECK", "Integrity verified" if integrity else "Integrity failed", {"integrity": integrity})
         yield HealEvent(self._now(), "VERIFY", "Integrity verified" if integrity else "Integrity failed", {"integrity": integrity})
 

@@ -56,8 +56,7 @@ class Node:
     def report_corruption(self, brick_id: int) -> None:
         for peer in self.peers:
             peer.engine.bricks[brick_id].corrupt()
-            peer.engine._braid_a = "RED"
-            peer.engine._braid_b = "RED"
+            peer.engine.set_braid_paths("RED", "RED")
 
     def get_braid_path_status(self) -> str:
         return "GREEN" if self.engine.braid_status() == "GREEN" else "RED"
