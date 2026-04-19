@@ -8,9 +8,9 @@ export class SB688Ledger {
   }
 
   timestamp() {
-    const now = new Date();
-    const base = now.toISOString();
-    const micros = now.getMilliseconds() * 1000 + Math.floor((performance.now() * 1000) % 1000);
+    const unixTimestampMicros = Math.floor((performance.timeOrigin + performance.now()) * 1000);
+    const base = new Date(Math.floor(unixTimestampMicros / 1000)).toISOString();
+    const micros = unixTimestampMicros % 1_000_000;
     return base.replace(/\.\d{3}Z$/, `.${String(micros).padStart(6, "0")}Z`);
   }
 

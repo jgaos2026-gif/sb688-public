@@ -8,12 +8,13 @@ const statusBraid = document.getElementById("status-braid");
 const statusPhase = document.getElementById("status-phase");
 const statusClock = document.getElementById("status-clock");
 const statusChain = document.getElementById("status-chain");
+const CLOCK_UPDATE_INTERVAL_MS = 25;
 
 function clockTick() {
   const now = new Date();
   statusClock.textContent = now.toISOString().split("T")[1].replace("Z", "");
 }
-setInterval(clockTick, 25);
+setInterval(clockTick, CLOCK_UPDATE_INTERVAL_MS);
 clockTick();
 
 function renderLedger(entry, lineNo) {
@@ -69,4 +70,14 @@ btnDownload.addEventListener("click", () => ledger.download("json"));
 btnJson.addEventListener("click", () => ledger.download("json"));
 btnCsv.addEventListener("click", () => ledger.download("csv"));
 
-simulator.init();
+simulator.init().catch(async (error) => {
+  statusChain.textContent = "BROKEN";
+  await ledger.append({
+    phase: "VERIFY",
+    event_type: "INIT_ERROR",
+    health: 0,
+    braid_status: "RED",
+    message: `Initialization failed: ${error?.message ?? "unknown error"}`,
+    data: { stack: String(error?.stack ?? "") },
+  });
+});

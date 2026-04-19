@@ -1,3 +1,15 @@
+const TARGET_CORRUPTION_PERCENT = 99.8;
+const MIN_HEALTH_PERCENT = 0.2;
+
+function shuffleIndices(length) {
+  const arr = Array.from({ length }, (_, i) => i);
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 export class Simulator {
   constructor({ ledger, visualization, onStatus }) {
     this.ledger = ledger;
@@ -10,6 +22,7 @@ export class Simulator {
     this.corrupted = false;
     this.runToken = 0;
     this.sequenceStartedAt = 0;
+    this.checkpointTimestamp = "GENESIS";
   }
 
   status() {
@@ -37,7 +50,7 @@ export class Simulator {
 
   async init() {
     this.syncViz(0);
-    await this.ledger.append({
+    const initEntry = await this.ledger.append({
       phase: "INIT",
       event_type: "SYSTEM_INIT",
       health: this.health,
@@ -45,28 +58,30 @@ export class Simulator {
       message: "System initialized. 64/64 bricks operational.",
       data: { bricks_operational: 64, readiness: "LIVE_DEMO_READY" },
     });
+    this.checkpointTimestamp = initEntry.timestamp;
   }
 
   async corruptSystem() {
     const token = ++this.runToken;
     this.sequenceStartedAt = performance.now();
     this.phase = "CORRUPT";
+    this.checkpointTimestamp = this.ledger.entries[this.ledger.entries.length - 1]?.timestamp ?? this.checkpointTimestamp;
     await this.ledger.append({
       phase: "CORRUPT",
       event_type: "CORRUPTION_START",
       health: this.health,
       braid_status: this.braidStatus,
       message: "Injecting controlled corruption: target 99.8% impact.",
-      data: { target_failure_percent: 99.8, duration_ms: 500 },
+      data: { target_failure_percent: TARGET_CORRUPTION_PERCENT, duration_ms: 500 },
     });
 
-    const order = Array.from({ length: 64 }, (_, i) => i).sort(() => Math.random() - 0.5);
+    const order = shuffleIndices(64);
     const toCorrupt = 63;
     for (let i = 0; i < toCorrupt; i += 1) {
       if (token !== this.runToken) return;
       const idx = order[i];
       this.bricks[idx] = "corrupted";
-      this.health = Number((100 - (i + 1) * ((99.8 / toCorrupt))).toFixed(1));
+      this.health = Number((100 - (i + 1) * (TARGET_CORRUPTION_PERCENT / toCorrupt)).toFixed(1));
       this.braidStatus = "RED";
       this.syncViz(performance.now() - this.sequenceStartedAt);
       await this.ledger.append({
@@ -80,7 +95,7 @@ export class Simulator {
       await this.wait(500 / toCorrupt);
     }
 
-    this.health = 0.2;
+    this.health = MIN_HEALTH_PERCENT;
     this.syncViz(performance.now() - this.sequenceStartedAt);
 
     this.phase = "DETECT";
@@ -125,8 +140,8 @@ export class Simulator {
       event_type: "CHECKPOINT_RESTORE",
       health: this.health,
       braid_status: "HEALING",
-      message: `CHECKPOINT_RESTORE: Reverting to ${this.ledger.entries[0]?.timestamp ?? "GENESIS"}`,
-      data: { rollback_duration_ms: 300, ghost_nodes: 5 },
+      message: `CHECKPOINT_RESTORE: Reverting to ${this.checkpointTimestamp}`,
+      data: { rollback_duration_ms: 300, ghost_nodes: 5, checkpoint_timestamp: this.checkpointTimestamp },
     });
     await this.wait(300);
     if (token !== this.runToken) return;
@@ -139,7 +154,7 @@ export class Simulator {
       if (token !== this.runToken) return;
       const idx = healOrder[i];
       this.bricks[idx] = "healing";
-      this.health = Number((0.2 + ((i + 1) / healOrder.length) * 99.8).toFixed(1));
+      this.health = Number((MIN_HEALTH_PERCENT + ((i + 1) / healOrder.length) * TARGET_CORRUPTION_PERCENT).toFixed(1));
       this.syncViz(performance.now() - this.sequenceStartedAt);
       await this.wait(500 / healOrder.length / 2);
       this.bricks[idx] = "operational";
@@ -173,7 +188,7 @@ export class Simulator {
     this.phase = "COMPLETE";
     this.corrupted = false;
     this.syncViz(performance.now() - this.sequenceStartedAt);
-    await this.ledger.append({
+    const completeEntry = await this.ledger.append({
       phase: "COMPLETE",
       event_type: "LEDGER_SEAL",
       health: this.health,
@@ -181,6 +196,7 @@ export class Simulator {
       message: "Recovery complete. Ledger sealed with final checksum.",
       data: { total_elapsed_ms: Math.round(performance.now() - this.sequenceStartedAt), final_hash: chain.final_hash },
     });
+    this.checkpointTimestamp = completeEntry.timestamp;
   }
 
   async killAndReset() {
@@ -208,7 +224,7 @@ export class Simulator {
     this.bricks = Array.from({ length: 64 }, () => "operational");
     this.corrupted = false;
     this.syncViz(0);
-    await this.ledger.append({
+    const resetEntry = await this.ledger.append({
       phase: "COMPLETE",
       event_type: "RESET_COMPLETE",
       health: this.health,
@@ -216,5 +232,6 @@ export class Simulator {
       message: "System rebuilt by ghost nodes. All bricks operational.",
       data: { bricks_operational: 64, elapsed_ms: 450 },
     });
+    this.checkpointTimestamp = resetEntry.timestamp;
   }
 }

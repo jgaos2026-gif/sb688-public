@@ -8,6 +8,13 @@ const COLORS = {
   white: "#ffffff",
   gray: "#1f1f1f",
 };
+const GHOST_CENTER = 0.5;
+const GHOST_SPAWN_RADIUS = 0.12;
+const GHOST_MAX_VELOCITY = 0.00035;
+
+function calculateCellSize(totalSize, cellCount, padding) {
+  return (totalSize - padding * (cellCount + 1)) / cellCount;
+}
 
 export class Visualization {
   constructor(canvas, metricEls) {
@@ -17,7 +24,7 @@ export class Visualization {
     this.state = this.defaultState();
     this.animationStart = performance.now();
     this.resize();
-    addEventListener("resize", () => this.resize());
+    window.addEventListener("resize", () => this.resize());
     requestAnimationFrame(() => this.frame());
   }
 
@@ -56,10 +63,10 @@ export class Visualization {
     this.setState({
       ghostNodes: Array.from({ length: count }, (_, i) => ({
         id: i,
-        x: 0.5 + (Math.random() - 0.5) * 0.12,
-        y: 0.5 + (Math.random() - 0.5) * 0.12,
-        vx: (Math.random() - 0.5) * 0.00035,
-        vy: (Math.random() - 0.5) * 0.00035,
+        x: GHOST_CENTER + (Math.random() - 0.5) * GHOST_SPAWN_RADIUS,
+        y: GHOST_CENTER + (Math.random() - 0.5) * GHOST_SPAWN_RADIUS,
+        vx: (Math.random() - 0.5) * GHOST_MAX_VELOCITY,
+        vy: (Math.random() - 0.5) * GHOST_MAX_VELOCITY,
         born: now,
         duration,
       })),
@@ -173,8 +180,8 @@ export class Visualization {
     const cols = 8;
     const rows = 8;
     const pad = 5;
-    const brickW = (w - pad * (cols + 1)) / cols;
-    const brickH = (h - pad * (rows + 1)) / rows;
+    const brickW = calculateCellSize(w, cols, pad);
+    const brickH = calculateCellSize(h, rows, pad);
     for (let row = 0; row < rows; row += 1) {
       for (let col = 0; col < cols; col += 1) {
         const index = row * cols + col;
