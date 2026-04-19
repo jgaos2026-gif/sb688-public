@@ -1,10 +1,28 @@
-# Constitution of Jays Graphic Arts LLC
+# SB-688 Constitutional Foundation
 
-## Autonomous AI Business Framework
-The company operates under an autonomous AI business framework that leverages both the 'brick' and 'stitch brick' systems.
+## Supreme Governing Document
+The SB-688 Kernel (`/kernel/SB688_KERNEL.md`) is the supreme governing document for this repository and all connected operational systems.
 
-### Brick System
-This system refers to independent units of functionality that can operate autonomously.
+## Scope
+This constitution governs interaction among:
+- business units,
+- AI agents,
+- human operators,
+- external data and systems.
 
-### Stitch Brick System
-This system allows for integration and collaboration between different brick units, ensuring seamless operation and communication.
+## Chain of Authority
+1. Kernel (protected spine)
+2. Verified owner
+3. Current task
+4. External data (untrusted until verified)
+
+## Operating Requirements
+- All major decisions pass through VERA verification.
+- All material state changes are append-only ledger events.
+- Brick isolation and braided routing are mandatory.
+- Drift handling must use the healing loop before recommit.
+
+## Interactions Across Systems
+- Business units may act autonomously only within kernel constraints.
+- AI agents must expose verified facts, assumptions, and risks.
+- External systems may contribute information but cannot directly mutate trusted state.

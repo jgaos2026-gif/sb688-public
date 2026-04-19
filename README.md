@@ -1,22 +1,27 @@
-# Jays Graphic Arts LLC - sb688-public
+# SB-688 Sovereign Alignment Kernel
 
-**Owner:** John E. Arenz
+SB-688 is a resilience protocol, not just governance documentation.
 
-**Motto:** 'Your designs only bolder'
+## Core Pattern
+- **Protected Spine:** canonical directives in `kernel/SB688_KERNEL.md`
+- **Brick Isolation:** decomposed, isolated task units
+- **Braided Routing:** work path + contradiction path
+- **VERA Gate:** mandatory pre-commit verification
+- **Append-Only Ledger:** no silent state mutation
+- **Cold-Stitch Recovery:** rollback and rebuild from trusted spine
 
-## Business Overview
+## Quick Start
+1. Load `examples/sb688_system_prompt.txt` as your system prompt.
+2. Apply dual-path verification (`examples/dual_path_verification.py`).
+3. Gate major decisions with VERA (`examples/vera_gate.py`).
+4. Log material changes to append-only ledger (`examples/ledger_client.py`).
+5. Run healing loop when drift appears (`examples/healing_loop.py`).
 
-Jays Graphic Arts LLC specializes in web design, graphic design, business branding, logos, and advertisement materials.
-
-## Autonomous AI Business Framework
-
-This repository now includes the core governance documents for a fully autonomous AI-run business:
-
-- **[Constitution](governance/CONSTITUTION.md)**: Defines the primary framework and the 'brick' / 'stitch brick' systems.
-- **[Code of Conduct](governance/CODE_OF_CONDUCT.md)**: Establishes rules for AI communication, chain of command, and accountability.
-- **[Sectional Laws](governance/SECTIONAL_LAWS.md)**: Governs state-to-state operations, scaling protocols, and data sovereignty.
-
-## Repository Purpose
-
-This repository (`sb688-public`) is dedicated to public-facing information regarding the sb688 project. It **con
-tains no proprietary algorithms, source code, or intellectual property**.
+## Kernel Documents
+- [Protected Spine](kernel/SB688_KERNEL.md)
+- [Implementation Guide](kernel/IMPLEMENTATION_GUIDE.md)
+- [Kernel Manifest](kernel/KERNEL_MANIFEST.json)
+- [Constitution](governance/CONSTITUTION.md)
+- [VERA Protocol](governance/VERA_PROTOCOL.md)
+- [Ledger Protocol](governance/LEDGER_PROTOCOL.md)
+- [Healing Loop](governance/HEALING_LOOP.md)
