@@ -16,6 +16,7 @@ SB-688 is a resilience protocol, not just governance documentation.
 3. Gate major decisions with VERA (`examples/vera_gate.py`).
 4. Log material changes to append-only ledger (`examples/ledger_client.py`).
 5. Run healing loop when drift appears (`examples/healing_loop.py`).
+6. Share a 10-second teaser (`python examples/teaser_snippet.py`).
 
 ## Kernel Documents
 - [Protected Spine](kernel/SB688_KERNEL.md)
