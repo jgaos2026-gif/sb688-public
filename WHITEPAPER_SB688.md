@@ -1,4 +1,4 @@
-# SB688 Whitepaper
+# SB-688 Whitepaper
 
 ## Introduction
 SB-688 is a resilience-first alignment kernel designed to keep reasoning systems reliable under noisy inputs, partial failures, and adversarial drift. Rather than treating governance, verification, and recovery as optional documentation layers, SB-688 operationalizes them as mandatory runtime controls.
