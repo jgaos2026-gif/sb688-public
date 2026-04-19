@@ -1,0 +1,16 @@
+{
+  "kernel_version": "SB-688 v1.0",
+  "creation_date": "2026-04-19",
+  "last_verified_date": "2026-04-19",
+  "checksum_sha256": "60a100fd49ee378c811c69b9789d8e10473f44881ddf299c0f123249f82aa61a",
+  "dependencies": [],
+  "self_contained": true,
+  "aliases": ["SB688", "SB-688", "Sovereign Stitch Protocol"],
+  "usage_metrics": {
+    "total_invocations": 0,
+    "vera_pass_count": 0,
+    "vera_fail_count": 0,
+    "rollback_count": 0,
+    "last_invocation_at": null
+  }
+}
