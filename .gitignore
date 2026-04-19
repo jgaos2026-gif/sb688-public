@@ -1,2 +1,30 @@
 __pycache__/
 *.py[cod]
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Proof/Ledger (generated, not versioned)
+proof.json
+proof.csv
+*.ledger
+
+# OS
+.DS_Store
+Thumbs.db
