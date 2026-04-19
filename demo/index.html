@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SB-688 Live Resilience Demo</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <section class="panel panel-ledger">
+        <header class="panel-header">
+          <h1>SB-688 LEDGER</h1>
+          <div class="button-row">
+            <button id="export-json">Export JSON</button>
+            <button id="export-csv">Export CSV</button>
+          </div>
+        </header>
+        <div id="ledger-stream" class="ledger-stream" aria-live="polite"></div>
+      </section>
+
+      <section class="panel panel-visual">
+        <header class="panel-header">
+          <h2>Death → Resurrection</h2>
+          <div class="metrics">
+            <span id="metric-health">HEALTH: 100.0%</span>
+            <span id="metric-braid">BRAID: GREEN</span>
+            <span id="metric-bricks">BRICKS: 64/64 operational</span>
+            <span id="metric-runtime">RUNTIME: 0ms</span>
+          </div>
+        </header>
+        <canvas id="viz-canvas" width="1200" height="800"></canvas>
+      </section>
+
+      <section class="panel panel-controls">
+        <header class="panel-header">
+          <h2>CONTROLS</h2>
+        </header>
+        <div class="control-stack">
+          <button id="btn-corrupt" class="danger">CORRUPT SYSTEM</button>
+          <button id="btn-recover" class="healing">WATCH RECOVERY</button>
+          <button id="btn-kill" class="neutral">KILL &amp; RESET</button>
+          <button id="btn-download" class="neutral">DOWNLOAD LEDGER</button>
+        </div>
+        <div class="status">
+          <div>HEALTH %: <strong id="status-health">100.0%</strong></div>
+          <div>BRAID STATUS: <strong id="status-braid">GREEN</strong></div>
+          <div>PHASE: <strong id="status-phase">INIT</strong></div>
+          <div>CLOCK: <strong id="status-clock">--:--:--.---</strong></div>
+          <div>CHAIN: <strong id="status-chain">VALID</strong></div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./animation-controller.js"></script>
+  </body>
+</html>

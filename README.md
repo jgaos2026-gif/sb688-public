@@ -25,3 +25,7 @@ SB-688 is a resilience protocol, not just governance documentation.
 - [VERA Protocol](governance/VERA_PROTOCOL.md)
 - [Ledger Protocol](governance/LEDGER_PROTOCOL.md)
 - [Healing Loop](governance/HEALING_LOOP.md)
+
+## Live Demo
+- [SB-688 Live Resilience Demo](demo/index.html)
+- [Demo Usage Guide](demo/README.md)
