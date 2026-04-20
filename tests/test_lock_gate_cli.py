@@ -32,6 +32,9 @@ def test_lock_creates_vault_state(tmp_path: Path) -> None:
     state = json.loads(state_path.read_text(encoding="utf-8"))
     assert state["locked"] is True
     assert state["root"] == str(root.resolve())
+    assert state["kdf"] == "pbkdf2_sha256"
+    assert state["iterations"] == 600_000
+    assert state["salt"]
 
 
 def test_lock_is_idempotent_with_same_code(tmp_path: Path) -> None:

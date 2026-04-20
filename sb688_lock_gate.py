@@ -10,14 +10,16 @@ from pathlib import Path
 
 
 STATE_FILE = "lock_gate_state.json"
+KDF_ITERATIONS = 600_000
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+def _utc_timestamp_str() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _hash_code(code: str) -> str:
-    return hashlib.sha256(code.encode("utf-8")).hexdigest()
+def _hash_code(code: str, salt: str, iterations: int = KDF_ITERATIONS) -> str:
+    derived = hashlib.pbkdf2_hmac("sha256", code.encode("utf-8"), salt.encode("utf-8"), iterations)
+    return derived.hex()
 
 
 def _state_path(vault: Path) -> Path:
@@ -33,7 +35,36 @@ def _load_state(vault: Path) -> dict | None:
 
 def _save_state(vault: Path, state: dict) -> None:
     vault.mkdir(parents=True, exist_ok=True)
-    _state_path(vault).write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+    path = _state_path(vault)
+    path.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+    path.chmod(0o600)
+
+
+def _code_matches(state: dict, code: str) -> bool:
+    expected_hash = state.get("code_hash")
+    if not expected_hash:
+        return False
+    salt = state.get("salt")
+    if salt:
+        iterations = int(state.get("iterations", KDF_ITERATIONS))
+        if iterations < KDF_ITERATIONS:
+            return False
+        return secrets.compare_digest(expected_hash, _hash_code(code, salt, iterations))
+    # Backward compatibility for unsalted state files.
+    legacy_hash = hashlib.sha256(code.encode("utf-8")).hexdigest()
+    return secrets.compare_digest(expected_hash, legacy_hash)
+
+
+def _migrate_legacy_hash(state: dict, code: str) -> dict:
+    if state.get("salt"):
+        return state
+    migrated = dict(state)
+    salt = secrets.token_hex(16)
+    migrated["kdf"] = "pbkdf2_sha256"
+    migrated["iterations"] = KDF_ITERATIONS
+    migrated["salt"] = salt
+    migrated["code_hash"] = _hash_code(code, salt)
+    return migrated
 
 
 def _resolve_root(root: str) -> Path:
@@ -52,19 +83,23 @@ def lock(root: str, vault: str, code: str) -> str:
     vault_path = Path(vault).resolve()
 
     existing = _load_state(vault_path)
-    code_hash = _hash_code(code)
     if existing and existing.get("locked"):
-        if not secrets.compare_digest(existing.get("code_hash", ""), code_hash):
+        if not _code_matches(existing, code):
             raise ValueError("Vault is already locked with a different code.")
         return "Vault already locked."
+
+    salt = secrets.token_hex(16)
 
     state = {
         "version": 1,
         "locked": True,
         "root": str(root_path),
         "vault": str(vault_path),
-        "code_hash": code_hash,
-        "updated_at": _now(),
+        "kdf": "pbkdf2_sha256",
+        "iterations": KDF_ITERATIONS,
+        "salt": salt,
+        "code_hash": _hash_code(code, salt),
+        "updated_at": _utc_timestamp_str(),
     }
     _save_state(vault_path, state)
     return "Vault locked."
@@ -79,11 +114,12 @@ def unlock(vault: str, code: str) -> str:
         raise ValueError("Vault is not initialized.")
     if not state.get("locked"):
         return "Vault already unlocked."
-    if not secrets.compare_digest(state.get("code_hash", ""), _hash_code(code)):
+    if not _code_matches(state, code):
         raise ValueError("Invalid code.")
-    state["locked"] = False
-    state["updated_at"] = _now()
-    _save_state(vault_path, state)
+    next_state = _migrate_legacy_hash(state, code)
+    next_state["locked"] = False
+    next_state["updated_at"] = _utc_timestamp_str()
+    _save_state(vault_path, next_state)
     return "Vault unlocked."
 
 
