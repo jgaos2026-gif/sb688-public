@@ -35,6 +35,8 @@ class SB688Engine:
         self._checkpoints: list[tuple[str, dict]] = []
         self._corruption_seed = 0
         self._sensitive_access_code = os.environ.get("SB688_SENSITIVE_ACCESS_CODE", "")
+        if not self._sensitive_access_code:
+            self._sensitive_access_code = secrets.token_hex(16)
         self._sensitive_access_granted = False
         self._unlock_attempts = 0
         self._max_unlock_attempts = 5

@@ -78,12 +78,14 @@ def main() -> None:
     # Proof export requires access code via environment variable
     access_code = os.environ.get("SB688_SENSITIVE_ACCESS_CODE")
     if access_code:
-        engine.unlock_sensitive_access(access_code)
-        with open("proof.json", "w", encoding="utf-8") as handle:
-            handle.write(engine.export_proof(format="json"))
-        with open("proof.csv", "w", encoding="utf-8") as handle:
-            handle.write(engine.export_proof(format="csv"))
-        print("Proof exported: proof.json, proof.csv")
+        if engine.unlock_sensitive_access(access_code):
+            with open("proof.json", "w", encoding="utf-8") as handle:
+                handle.write(engine.export_proof(format="json"))
+            with open("proof.csv", "w", encoding="utf-8") as handle:
+                handle.write(engine.export_proof(format="csv"))
+            print("Proof exported: proof.json, proof.csv")
+        else:
+            print("Unlock failed: incorrect access code or attempt limit reached.")
     else:
         print("Set SB688_SENSITIVE_ACCESS_CODE to export proof artifacts.")
 

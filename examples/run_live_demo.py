@@ -63,7 +63,9 @@ def main() -> None:
     if not access_code:
         print("Set SB688_SENSITIVE_ACCESS_CODE to export proof artifacts.")
         return
-    engine.unlock_sensitive_access(access_code)
+    if not engine.unlock_sensitive_access(access_code):
+        print("Unlock failed: incorrect access code or attempt limit reached.")
+        return
     with open("proof.json", "w", encoding="utf-8") as handle:
         handle.write(engine.export_proof(format="json"))
     with open("proof.csv", "w", encoding="utf-8") as handle:
