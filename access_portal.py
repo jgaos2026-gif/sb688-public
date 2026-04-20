@@ -34,6 +34,7 @@ class AccessToken:
     access_code_hash: str
     repository_url: str
     valid: bool = True
+    approved: bool = False  # Requires manual approval before use
 
 
 class AccessPortal:
@@ -64,10 +65,18 @@ class AccessPortal:
         try:
             with open(self.storage_path, 'r') as f:
                 data = json.load(f)
-                # Clean up expired tokens
-                return {k: v for k, v in data.items() if self._is_token_valid(v)}
+                # Only clean up truly expired tokens (not pending ones)
+                return {k: v for k, v in data.items() if self._is_not_expired(v)}
         except Exception:
             return {}
+
+    def _is_not_expired(self, token_data: dict) -> bool:
+        """Check if a token has not expired (ignores approval status)."""
+        try:
+            expires_at = datetime.fromisoformat(token_data['expires_at'])
+            return datetime.now() < expires_at
+        except Exception:
+            return False
 
     def _save_tokens(self):
         """Save tokens to storage."""
@@ -78,7 +87,9 @@ class AccessPortal:
         """Check if a token is still valid."""
         try:
             expires_at = datetime.fromisoformat(token_data['expires_at'])
-            return datetime.now() < expires_at and token_data.get('valid', True)
+            is_approved = token_data.get('approved', False)
+            is_valid = token_data.get('valid', True)
+            return datetime.now() < expires_at and is_valid and is_approved
         except Exception:
             return False
 
@@ -107,7 +118,7 @@ class AccessPortal:
             else self.PRIVATE_REPO_DEMO
         )
 
-        # Create access token
+        # Create access token (pending approval)
         access_token = AccessToken(
             token=token,
             access_level=access_level,
@@ -115,7 +126,8 @@ class AccessPortal:
             expires_at=expires_at.isoformat(),
             access_code_hash=self._hash_code(access_code),
             repository_url=repo_url,
-            valid=True
+            valid=True,
+            approved=False  # Token starts in pending state
         )
 
         # Store token
@@ -147,9 +159,41 @@ class AccessPortal:
     def cleanup_expired(self) -> int:
         """Remove expired tokens and return count removed."""
         original_count = len(self.tokens)
-        self.tokens = {k: v for k, v in self.tokens.items() if self._is_token_valid(v)}
+        self.tokens = {k: v for k, v in self.tokens.items() if self._is_not_expired(v)}
         self._save_tokens()
         return original_count - len(self.tokens)
+
+    def approve_token(self, token: str) -> bool:
+        """Approve a pending token."""
+        if token in self.tokens:
+            self.tokens[token]['approved'] = True
+            self._save_tokens()
+            return True
+        return False
+
+    def deny_token(self, token: str) -> bool:
+        """Deny a pending token by marking it invalid."""
+        if token in self.tokens:
+            self.tokens[token]['valid'] = False
+            self._save_tokens()
+            return True
+        return False
+
+    def list_pending_tokens(self) -> list:
+        """List all pending (unapproved but valid) tokens."""
+        pending = []
+        for token, data in self.tokens.items():
+            try:
+                expires_at = datetime.fromisoformat(data['expires_at'])
+                is_not_expired = datetime.now() < expires_at
+                is_pending = not data.get('approved', False)
+                is_valid = data.get('valid', True)
+
+                if is_not_expired and is_pending and is_valid:
+                    pending.append(AccessToken(**data))
+            except Exception:
+                pass
+        return pending
 
     def format_access_instructions(self, token: AccessToken) -> str:
         """Format access instructions for AI systems."""
@@ -263,20 +307,107 @@ For AI systems requesting access, use:
         """)
         sys.exit(1)
 
-    # Display access instructions
-    print(portal.format_access_instructions(token))
+    # Display pending approval message
+    print(f"""
+╔══════════════════════════════════════════════════════════════════╗
+║            SB-688 ACCESS REQUEST RECEIVED                        ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Access Level: {token.access_level.upper()}
+Token: {token.token}
+Status: PENDING APPROVAL
+
+Your access request has been received and is awaiting approval.
+
+═══════════════════════════════════════════════════════════════════
+
+NEXT STEPS:
+
+1. Your request must be manually approved by the administrator
+2. Once approved, the token will be valid for 1 hour
+3. You will be notified when approved (check token status)
+
+To check approval status:
+  python access_portal.py verify --token {token.token}
+
+═══════════════════════════════════════════════════════════════════
+
+REQUESTED ACCESS:
+""")
+
+    if token.access_level == "full":
+        print("""✓ Complete source code access
+✓ All advanced nodes (Ghost, Truth, Phoenix)
+✓ Full documentation and implementation guides
+✓ Production deployment configurations
+✓ Integration examples and templates
+✓ Test suites and validation tools""")
+    else:
+        print("""✓ Basic framework and architecture
+✓ Limited demo examples
+✓ Public documentation only
+✓ Read-only access""")
+
+    print(f"""
+═══════════════════════════════════════════════════════════════════
+
+ADMINISTRATOR: To approve this request, run:
+  python access_portal.py approve --token {token.token}
+
+To deny this request, run:
+  python access_portal.py deny --token {token.token}
+
+═══════════════════════════════════════════════════════════════════
+""")
 
     # Save token to file for AI to read
     token_file = Path(f".token_{token.token[:8]}.json")
     with open(token_file, 'w') as f:
         json.dump(asdict(token), f, indent=2)
 
-    print(f"\n[Token saved to: {token_file}]")
+    print(f"[Token saved to: {token_file}]")
+    print(f"[Status: PENDING APPROVAL]")
 
 
 def cmd_verify(args):
     """Verify an access token."""
     portal = AccessPortal()
+
+    # First check if token exists at all
+    if args.token not in portal.tokens:
+        print(f"""
+╔══════════════════════════════════════════════════════════════════╗
+║                   TOKEN NOT FOUND                                ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Token: {args.token}
+
+This token does not exist in the system.
+        """)
+        sys.exit(1)
+
+    token_data = portal.tokens[args.token]
+    token_obj = AccessToken(**token_data)
+
+    # Check if pending approval
+    if not token_data.get('approved', False):
+        print(f"""
+╔══════════════════════════════════════════════════════════════════╗
+║                   TOKEN PENDING APPROVAL                         ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Token: {args.token}
+Access Level: {token_obj.access_level.upper()}
+Status: AWAITING APPROVAL
+
+This token has not yet been approved by the administrator.
+
+To use this token, it must first be approved:
+  python access_portal.py approve --token {args.token}
+        """)
+        sys.exit(1)
+
+    # Check if valid (approved, not expired, not revoked)
     token = portal.verify_token(args.token)
 
     if token is None:
@@ -290,7 +421,7 @@ Token: {args.token}
 Reasons for invalid token:
 • Token has expired (> 1 hour old)
 • Token was revoked
-• Token never existed
+• Token was denied
 
 Request a new token with:
   python access_portal.py request --code <ACCESS_CODE>
@@ -305,6 +436,7 @@ Request a new token with:
 Access Level: {token.access_level.upper()}
 Time Remaining: {portal._get_time_remaining(token)}
 Repository: {token.repository_url}
+Status: APPROVED
     """)
 
 
@@ -333,10 +465,110 @@ def cmd_list(args):
     for token, data in portal.tokens.items():
         token_obj = AccessToken(**data)
         time_remaining = portal._get_time_remaining(token_obj)
+        approval_status = "APPROVED" if data.get('approved', False) else "PENDING"
         print(f"Token: {token[:16]}...")
         print(f"  Level: {token_obj.access_level}")
+        print(f"  Status: {approval_status}")
         print(f"  Expires: {token_obj.expires_at}")
         print(f"  Remaining: {time_remaining}")
+        print("-" * 80)
+
+
+def cmd_approve(args):
+    """Approve a pending token (admin only)."""
+    portal = AccessPortal()
+
+    if args.token not in portal.tokens:
+        print(f"Token {args.token} not found.")
+        sys.exit(1)
+
+    token_data = portal.tokens[args.token]
+
+    if token_data.get('approved', False):
+        print(f"""
+╔══════════════════════════════════════════════════════════════════╗
+║                 TOKEN ALREADY APPROVED                           ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Token: {args.token}
+This token has already been approved.
+        """)
+        return
+
+    success = portal.approve_token(args.token)
+
+    if success:
+        token_obj = AccessToken(**portal.tokens[args.token])
+        print(f"""
+╔══════════════════════════════════════════════════════════════════╗
+║                   TOKEN APPROVED                                 ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Token: {args.token}
+Access Level: {token_obj.access_level.upper()}
+Status: APPROVED
+
+The token is now active and can be used to access the repository.
+
+Time Remaining: {portal._get_time_remaining(token_obj)}
+Repository: {token_obj.repository_url}
+
+═══════════════════════════════════════════════════════════════════
+
+USER NOTIFICATION:
+The user can now verify their token:
+  python access_portal.py verify --token {args.token}
+        """)
+    else:
+        print(f"Failed to approve token {args.token}")
+
+
+def cmd_deny(args):
+    """Deny a pending token (admin only)."""
+    portal = AccessPortal()
+
+    if args.token not in portal.tokens:
+        print(f"Token {args.token} not found.")
+        sys.exit(1)
+
+    success = portal.deny_token(args.token)
+
+    if success:
+        print(f"""
+╔══════════════════════════════════════════════════════════════════╗
+║                   TOKEN DENIED                                   ║
+╚══════════════════════════════════════════════════════════════════╝
+
+Token: {args.token}
+Status: DENIED
+
+The access request has been denied and the token is now invalid.
+        """)
+    else:
+        print(f"Failed to deny token {args.token}")
+
+
+def cmd_list_pending(args):
+    """List all pending tokens awaiting approval (admin only)."""
+    portal = AccessPortal()
+    pending = portal.list_pending_tokens()
+
+    if not pending:
+        print("No pending tokens awaiting approval.")
+        return
+
+    print("\nPending Access Requests:")
+    print("=" * 80)
+    for token_obj in pending:
+        time_remaining = portal._get_time_remaining(token_obj)
+        print(f"Token: {token_obj.token[:16]}...")
+        print(f"  Access Level: {token_obj.access_level.upper()}")
+        print(f"  Created: {token_obj.created_at}")
+        print(f"  Expires: {token_obj.expires_at}")
+        print(f"  Time Remaining: {time_remaining}")
+        print(f"  Status: PENDING APPROVAL")
+        print(f"\n  To approve: python access_portal.py approve --token {token_obj.token}")
+        print(f"  To deny:    python access_portal.py deny --token {token_obj.token}")
         print("-" * 80)
 
 
@@ -403,6 +635,34 @@ Access Codes:
         help="List active tokens (admin)"
     )
 
+    # Approve command (admin)
+    approve_parser = subparsers.add_parser(
+        "approve",
+        help="Approve a pending token (admin)"
+    )
+    approve_parser.add_argument(
+        "--token",
+        required=True,
+        help="Token to approve"
+    )
+
+    # Deny command (admin)
+    deny_parser = subparsers.add_parser(
+        "deny",
+        help="Deny a pending token (admin)"
+    )
+    deny_parser.add_argument(
+        "--token",
+        required=True,
+        help="Token to deny"
+    )
+
+    # List pending command (admin)
+    subparsers.add_parser(
+        "list-pending",
+        help="List tokens awaiting approval (admin)"
+    )
+
     args = parser.parse_args()
 
     if not args.command:
@@ -414,6 +674,9 @@ Access Codes:
         "verify": cmd_verify,
         "revoke": cmd_revoke,
         "list": cmd_list,
+        "approve": cmd_approve,
+        "deny": cmd_deny,
+        "list-pending": cmd_list_pending,
     }
 
     commands[args.command](args)
