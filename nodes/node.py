@@ -15,12 +15,14 @@ class Node:
     def join_network(self, peers: list["Node"]) -> None:
         self.peers = peers
 
-    def get_state(self) -> dict[str, Any]:
-        state = self.engine.get_state()
+    def get_state(self, include_sensitive: bool = False) -> dict[str, Any]:
+        state = self.engine.get_state(include_sensitive=include_sensitive)
         state["node_id"] = self.node_id
         return state
 
     def sync_state_with_peers(self) -> bool:
+        if not self.engine._sensitive_access_granted:
+            raise PermissionError("Access denied: sync_state_with_peers requires sensitive access.")
         active_nodes = [self] + [p for p in self.peers if p.peers or p is self]
         if len(active_nodes) < 3:
             return False
@@ -38,6 +40,8 @@ class Node:
         return changed
 
     def apply_brick_state(self, brick_id: int, state: dict[str, Any]) -> None:
+        if not self.engine._sensitive_access_granted:
+            raise PermissionError("Access denied: apply_brick_state requires sensitive access.")
         if "data" in state:
             self.engine.bricks[brick_id].set_data(bytes.fromhex(state["data"]))
         self.engine.bricks[brick_id].state = state.get("state", self.engine.bricks[brick_id].state)
@@ -46,6 +50,8 @@ class Node:
         self.sync_state_with_peers()
 
     def participate_in_healing(self, contaminated: set[int]) -> None:
+        if not self.engine._sensitive_access_granted:
+            raise PermissionError("Access denied: participate_in_healing requires sensitive access.")
         for brick_id in sorted(contaminated):
             for peer in self.peers:
                 peer_brick = peer.engine.bricks[brick_id]
