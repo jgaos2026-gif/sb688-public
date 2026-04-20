@@ -1,0 +1,155 @@
+name: SB-688 CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.txt
+
+    - name: Run tests
+      run: |
+        make test
+
+    - name: Run integration tests
+      run: |
+        python -m pytest tests/test_integration.py -v
+
+    - name: Verify system integrity
+      run: |
+        python sb688.py verify
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.txt
+
+    - name: Run tests with coverage
+      run: |
+        make test-coverage
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v4
+      with:
+        files: ./htmlcov/index.html
+        fail_ci_if_error: false
+
+  demo:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r tests/requirements.txt
+
+    - name: Run live demo
+      run: |
+        python sb688.py demo
+
+    - name: Verify proof files
+      run: |
+        test -f proof.json
+        test -f proof.csv
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      run: |
+        docker build -f deploy/Dockerfile -t sb688:test .
+
+    - name: Verify Docker image
+      run: |
+        docker images | grep sb688
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black mypy
+
+    - name: Run flake8
+      run: |
+        flake8 kernel/ nodes/ examples/ tests/ --max-line-length=120 --extend-ignore=E203,W503
+      continue-on-error: true
+
+    - name: Run black (check only)
+      run: |
+        black --check kernel/ nodes/ examples/ tests/ --line-length=120
+      continue-on-error: true
+
+  kernel-integrity:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Verify kernel manifest
+      run: |
+        test -f kernel/KERNEL_MANIFEST.json
+        test -f kernel/SB688_KERNEL.md
+        test -f kernel/IMPLEMENTATION_GUIDE.md
+
+    - name: Verify governance documents
+      run: |
+        test -f governance/CONSTITUTION.md
+        test -f governance/VERA_PROTOCOL.md
+        test -f governance/LEDGER_PROTOCOL.md
+        test -f governance/HEALING_LOOP.md
+
+    - name: Verify examples
+      run: |
+        test -f examples/sb688_system_prompt.txt
+        test -f examples/dual_path_verification.py
+        test -f examples/vera_gate.py
+        test -f examples/ledger_client.py
+        test -f examples/healing_loop.py
