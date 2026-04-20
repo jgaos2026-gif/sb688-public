@@ -1,4 +1,4 @@
-"""Tests for Node-level lock 1211 protection."""
+"""Tests for Node-level lock protection."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import pytest
 
 from kernel.SB688_ENGINE import SB688Engine
 from nodes.node import Node
+from tests.conftest import TEST_ACCESS_CODE
 
 
 def test_node_get_state_respects_lock() -> None:
@@ -22,7 +23,7 @@ def test_node_get_state_respects_lock() -> None:
         node.get_state(include_sensitive=True)
 
     # Unlock and verify sensitive data is accessible
-    assert engine.unlock_sensitive_access("1211")
+    assert engine.unlock_sensitive_access(TEST_ACCESS_CODE)
     sensitive_state = node.get_state(include_sensitive=True)
     assert sensitive_state["bricks"][0]["data"] != "LOCKED"
     assert bytes.fromhex(sensitive_state["bricks"][0]["data"])
@@ -40,7 +41,7 @@ def test_node_sync_state_requires_lock() -> None:
 
     # Should succeed after unlock
     for n in nodes:
-        n.engine.unlock_sensitive_access("1211")
+        n.engine.unlock_sensitive_access(TEST_ACCESS_CODE)
 
     # Now should work
     result = nodes[0].sync_state_with_peers()
@@ -62,7 +63,7 @@ def test_node_apply_brick_state_requires_lock() -> None:
         node.apply_brick_state(0, brick_state)
 
     # Should succeed after unlock
-    assert engine.unlock_sensitive_access("1211")
+    assert engine.unlock_sensitive_access(TEST_ACCESS_CODE)
     node.apply_brick_state(0, brick_state)
     assert engine.bricks[0].state == "operational"
 
@@ -82,7 +83,7 @@ def test_node_participate_in_healing_requires_lock() -> None:
 
     # Should succeed after unlock
     for n in nodes:
-        n.engine.unlock_sensitive_access("1211")
+        n.engine.unlock_sensitive_access(TEST_ACCESS_CODE)
 
     nodes[0].participate_in_healing(contaminated)
     # Brick should be healed from peer
@@ -101,6 +102,6 @@ def test_node_heartbeat_requires_lock() -> None:
 
     # Should succeed after unlock
     for n in nodes:
-        n.engine.unlock_sensitive_access("1211")
+        n.engine.unlock_sensitive_access(TEST_ACCESS_CODE)
 
     nodes[0].heartbeat()  # Should not raise

@@ -26,3 +26,10 @@ proof.csv
 # OS
 .DS_Store
 Thumbs.db
+
+# ── Private Boundaries (NEVER commit) ──────────────
+private_kernel/
+private_governance/
+private_recovery/
+vault_locked/
+docs_private/
