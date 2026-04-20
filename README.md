@@ -29,6 +29,11 @@ python sb688.py heal --inject 50
 # Quick teaser
 python sb688.py teaser
 
+# Advanced node demonstrations
+python sb688.py ghost     # Covert operations
+python sb688.py truth     # Disinformation detection
+python sb688.py phoenix   # Disaster recovery
+
 # Show version
 python sb688.py version
 ```
@@ -64,6 +69,7 @@ python sb688.py version
 ### Advanced Nodes
 - [Ghost Node](nodes/ghost_node.py) - Covert operations module
 - [Truth Node](nodes/truth_node.py) - Disinformation detection
+- [Phoenix Node](nodes/phoenix_node.py) - Disaster recovery system
 
 ## Features
 

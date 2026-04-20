@@ -101,6 +101,12 @@ def cmd_truth_demo(args):
     main()
 
 
+def cmd_phoenix_demo(args):
+    """Run Phoenix Node demonstration."""
+    from examples.phoenix_node_demo import main
+    main()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="SB-688 Sovereign Alignment Kernel",
@@ -114,6 +120,7 @@ Examples:
   sb688.py teaser            Run 10-second teaser
   sb688.py ghost             Ghost Node demo (covert ops)
   sb688.py truth             Truth Node demo (disinformation)
+  sb688.py phoenix           Phoenix Node demo (disaster recovery)
   sb688.py version           Show version info
         """,
     )
@@ -136,6 +143,7 @@ Examples:
     subparsers.add_parser("version", help="Show version information")
     subparsers.add_parser("ghost", help="Run Ghost Node demo (covert ops)")
     subparsers.add_parser("truth", help="Run Truth Node demo (disinformation detection)")
+    subparsers.add_parser("phoenix", help="Run Phoenix Node demo (disaster recovery)")
 
     args = parser.parse_args()
 
@@ -152,6 +160,7 @@ Examples:
         "version": cmd_version,
         "ghost": cmd_ghost_demo,
         "truth": cmd_truth_demo,
+        "phoenix": cmd_phoenix_demo,
     }
 
     commands[args.command](args)
