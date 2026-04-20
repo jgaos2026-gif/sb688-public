@@ -30,3 +30,4 @@ The live demo writes:
 - `proof.csv`
 
 Sensitive state/proof export is access-controlled and must be unlocked with code `1211`.
+You can override this code by setting `SB688_SENSITIVE_ACCESS_CODE`.
