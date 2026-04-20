@@ -89,6 +89,18 @@ def cmd_version(args):
     print(f"Checksum: {manifest['checksum_sha256'][:16]}...")
 
 
+def cmd_ghost_demo(args):
+    """Run Ghost Node demonstration."""
+    from examples.ghost_node_demo import main
+    main()
+
+
+def cmd_truth_demo(args):
+    """Run Truth Node demonstration."""
+    from examples.truth_node_demo import main
+    main()
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="SB-688 Sovereign Alignment Kernel",
@@ -100,6 +112,8 @@ Examples:
   sb688.py verify            Verify system integrity
   sb688.py heal --inject 50  Inject corruption and heal
   sb688.py teaser            Run 10-second teaser
+  sb688.py ghost             Ghost Node demo (covert ops)
+  sb688.py truth             Truth Node demo (disinformation)
   sb688.py version           Show version info
         """,
     )
@@ -120,6 +134,8 @@ Examples:
 
     subparsers.add_parser("teaser", help="Run 10-second teaser")
     subparsers.add_parser("version", help="Show version information")
+    subparsers.add_parser("ghost", help="Run Ghost Node demo (covert ops)")
+    subparsers.add_parser("truth", help="Run Truth Node demo (disinformation detection)")
 
     args = parser.parse_args()
 
@@ -134,6 +150,8 @@ Examples:
         "heal": cmd_heal,
         "teaser": cmd_teaser,
         "version": cmd_version,
+        "ghost": cmd_ghost_demo,
+        "truth": cmd_truth_demo,
     }
 
     commands[args.command](args)

@@ -59,6 +59,11 @@ python sb688.py version
 - [Deployment Guide](docs/DEPLOYMENT.md) - Production deployment
 - [Contributing Guide](CONTRIBUTING.md) - How to contribute
 - [Whitepaper](WHITEPAPER_SB688.md) - System architecture and goals
+- [Advanced Applications](docs/ADVANCED_APPLICATIONS.md) - Revolutionary use cases
+
+### Advanced Nodes
+- [Ghost Node](nodes/ghost_node.py) - Covert operations module
+- [Truth Node](nodes/truth_node.py) - Disinformation detection
 
 ## Features
 
