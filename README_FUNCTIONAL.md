@@ -28,3 +28,5 @@ curl http://localhost:5000/ledger
 The live demo writes:
 - `proof.json`
 - `proof.csv`
+
+Sensitive state/proof export is access-controlled and must be unlocked with code `1211`.

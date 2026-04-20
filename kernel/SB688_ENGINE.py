@@ -23,6 +23,7 @@ class HealEvent:
 
 class SB688Engine:
     TOTAL_BRICKS = 64
+    SENSITIVE_ACCESS_CODE = "1211"
 
     def __init__(self) -> None:
         self.bricks = {i: Brick(i) for i in range(self.TOTAL_BRICKS)}
@@ -32,6 +33,7 @@ class SB688Engine:
         self.vera = VERAGate()
         self._checkpoints: list[tuple[str, dict]] = []
         self._corruption_seed = 0
+        self._sensitive_access_granted = False
         self._log("INIT", "SYSTEM_INIT", "System initialized")
         self._save_checkpoint()
 
@@ -39,7 +41,7 @@ class SB688Engine:
     def _now() -> str:
         return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
-    def _state_snapshot(self) -> dict:
+    def _state_snapshot(self, include_sensitive: bool = False) -> dict:
         return {
             "timestamp": self._now(),
             "health": self.health(),
@@ -49,7 +51,7 @@ class SB688Engine:
                     "state": brick.state,
                     "checksum": brick.checksum(),
                     "timestamp": brick.timestamp,
-                    "data": brick.get_data().hex(),
+                    "data": brick.get_data().hex() if include_sensitive else "LOCKED",
                 }
                 for i, brick in self.bricks.items()
             },
@@ -69,7 +71,7 @@ class SB688Engine:
         )
 
     def _save_checkpoint(self) -> None:
-        snapshot = self._state_snapshot()
+        snapshot = self._state_snapshot(include_sensitive=True)
         ts = snapshot["timestamp"]
         cp = deepcopy(snapshot)
         cp["ledger"] = []
@@ -170,9 +172,17 @@ class SB688Engine:
         return self.ledger_store.get_all()
 
     def export_proof(self, format: str = "json") -> str:
+        if not self._sensitive_access_granted:
+            raise PermissionError("Sensitive export is locked behind code 1211.")
         if format == "csv":
             return self.ledger_store.export_csv()
         return self.ledger_store.export_json()
 
-    def get_state(self) -> dict:
-        return self._state_snapshot()
+    def unlock_sensitive_access(self, code: str) -> bool:
+        self._sensitive_access_granted = code == self.SENSITIVE_ACCESS_CODE
+        return self._sensitive_access_granted
+
+    def get_state(self, include_sensitive: bool = False) -> dict:
+        if include_sensitive and not self._sensitive_access_granted:
+            raise PermissionError("Sensitive state is locked behind code 1211.")
+        return self._state_snapshot(include_sensitive=include_sensitive)

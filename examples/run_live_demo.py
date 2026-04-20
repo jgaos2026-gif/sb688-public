@@ -58,6 +58,7 @@ def main() -> None:
     print(f"Braid status: {engine.braid_status()}")
     print(f"Data integrity: {'VERIFIED' if is_valid else 'FAILED'}")
 
+    engine.unlock_sensitive_access("1211")
     with open("proof.json", "w", encoding="utf-8") as handle:
         handle.write(engine.export_proof(format="json"))
     with open("proof.csv", "w", encoding="utf-8") as handle:

@@ -66,3 +66,23 @@ def test_vera_blocks_unsafe_commit() -> None:
     for _ in engine.heal_from_spine():
         pass
     assert vera.can_commit_state(engine.get_state())
+
+
+def test_sensitive_state_and_export_locked_by_code() -> None:
+    engine = SB688Engine()
+
+    state = engine.get_state()
+    assert state["bricks"][0]["data"] == "LOCKED"
+
+    with pytest.raises(PermissionError):
+        engine.get_state(include_sensitive=True)
+
+    with pytest.raises(PermissionError):
+        engine.export_proof(format="json")
+
+    assert not engine.unlock_sensitive_access("bad-code")
+    assert engine.unlock_sensitive_access("1211")
+
+    unlocked_state = engine.get_state(include_sensitive=True)
+    assert unlocked_state["bricks"][0]["data"] != "LOCKED"
+    assert engine.export_proof(format="json").startswith("[")
