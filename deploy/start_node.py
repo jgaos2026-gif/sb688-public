@@ -1,6 +1,6 @@
 import os
 
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 
 from kernel.SB688_ENGINE import SB688Engine
 from nodes.node import Node
@@ -17,7 +17,11 @@ app = Flask(__name__)
 
 @app.route("/status")
 def status():
-    return jsonify(node.get_state())
+    include_sensitive = request.args.get("include_sensitive", "false").lower() == "true"
+    try:
+        return jsonify(node.get_state(include_sensitive=include_sensitive))
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
 
 
 @app.route("/corrupt", methods=["POST"])
@@ -34,7 +38,23 @@ def heal():
 
 @app.route("/ledger")
 def ledger():
-    return jsonify({"ledger": node.engine.get_ledger()})
+    try:
+        return jsonify({"ledger": node.engine.get_ledger()})
+    except PermissionError as e:
+        return jsonify({"error": str(e)}), 403
+
+
+@app.route("/unlock", methods=["POST"])
+def unlock():
+    code = request.json.get("code", "") if request.json else ""
+    success = node.engine.unlock_sensitive_access(code)
+    return jsonify({"unlocked": success}), 200 if success else 401
+
+
+@app.route("/lock", methods=["POST"])
+def lock():
+    node.engine.lock_sensitive_access()
+    return jsonify({"locked": True})
 
 
 if __name__ == "__main__":
