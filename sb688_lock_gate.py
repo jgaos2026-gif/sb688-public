@@ -11,10 +11,11 @@ from pathlib import Path
 
 STATE_FILE = "lock_gate_state.json"
 KDF_ITERATIONS = 600_000
+MIN_CODE_LENGTH = 4
 
 
 def _utc_timestamp_str() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 
 def _hash_code(code: str, salt: str, iterations: int = KDF_ITERATIONS) -> str:
@@ -46,8 +47,11 @@ def _code_matches(state: dict, code: str) -> bool:
         return False
     salt = state.get("salt")
     if salt:
-        iterations = int(state.get("iterations", KDF_ITERATIONS))
-        if iterations < KDF_ITERATIONS:
+        try:
+            iterations = int(state.get("iterations", KDF_ITERATIONS))
+        except (TypeError, ValueError):
+            return False
+        if iterations < 1:
             return False
         return secrets.compare_digest(expected_hash, _hash_code(code, salt, iterations))
     # Backward compatibility for unsalted state files.
@@ -55,8 +59,25 @@ def _code_matches(state: dict, code: str) -> bool:
     return secrets.compare_digest(expected_hash, legacy_hash)
 
 
-def _migrate_legacy_hash(state: dict, code: str) -> dict:
-    if state.get("salt"):
+def _needs_hash_upgrade(state: dict) -> bool:
+    salt = state.get("salt")
+    if not salt:
+        return True
+    if state.get("kdf") != "pbkdf2_sha256":
+        return True
+    try:
+        iterations = int(state.get("iterations", 0))
+    except (TypeError, ValueError):
+        return True
+    return iterations < KDF_ITERATIONS
+
+
+def _is_legacy_state(state: dict) -> bool:
+    return not state.get("salt") or state.get("kdf") != "pbkdf2_sha256"
+
+
+def _upgrade_hash(state: dict, code: str) -> dict:
+    if not _needs_hash_upgrade(state):
         return state
     migrated = dict(state)
     salt = secrets.token_hex(16)
@@ -77,8 +98,8 @@ def _resolve_root(root: str) -> Path:
 
 
 def lock(root: str, vault: str, code: str) -> str:
-    if not code:
-        raise ValueError("Code cannot be empty.")
+    if not code or len(code) < MIN_CODE_LENGTH:
+        raise ValueError(f"Code must be at least {MIN_CODE_LENGTH} characters.")
     root_path = _resolve_root(root)
     vault_path = Path(vault).resolve()
 
@@ -86,6 +107,8 @@ def lock(root: str, vault: str, code: str) -> str:
     if existing and existing.get("locked"):
         if not _code_matches(existing, code):
             raise ValueError("Vault is already locked with a different code.")
+        if _is_legacy_state(existing):
+            print("Warning: legacy hash format detected; it will be upgraded on unlock.", file=sys.stderr)
         return "Vault already locked."
 
     salt = secrets.token_hex(16)
@@ -106,8 +129,8 @@ def lock(root: str, vault: str, code: str) -> str:
 
 
 def unlock(vault: str, code: str) -> str:
-    if not code:
-        raise ValueError("Code cannot be empty.")
+    if not code or len(code) < MIN_CODE_LENGTH:
+        raise ValueError(f"Code must be at least {MIN_CODE_LENGTH} characters.")
     vault_path = Path(vault).resolve()
     state = _load_state(vault_path)
     if not state:
@@ -116,7 +139,9 @@ def unlock(vault: str, code: str) -> str:
         return "Vault already unlocked."
     if not _code_matches(state, code):
         raise ValueError("Invalid code.")
-    next_state = _migrate_legacy_hash(state, code)
+    if _is_legacy_state(state):
+        print("Warning: upgrading legacy hash format for vault state.", file=sys.stderr)
+    next_state = _upgrade_hash(state, code)
     next_state["locked"] = False
     next_state["updated_at"] = _utc_timestamp_str()
     _save_state(vault_path, next_state)
