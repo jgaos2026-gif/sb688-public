@@ -25,13 +25,14 @@ curl http://localhost:5000/ledger
 
 ### API Endpoints with Lock Protection
 
-All sensitive operations require unlocking with code `1211`:
+All sensitive operations require unlocking with an access code set via
+the `SB688_SENSITIVE_ACCESS_CODE` environment variable:
 
 ```bash
 # Unlock sensitive access
 curl -X POST http://localhost:5000/unlock \
   -H "Content-Type: application/json" \
-  -d '{"code": "1211"}'
+  -d '{"code": "<your-access-code>"}'
 
 # Access sensitive state
 curl http://localhost:5000/status?include_sensitive=true
@@ -46,9 +47,10 @@ The live demo writes:
 - `proof.json`
 - `proof.csv`
 
-## Security: Lock 1211 Protection
+## Security: Lock Protection
 
-All sensitive operations are protected by lock code `1211`:
+All sensitive operations are protected by the access code configured via
+`SB688_SENSITIVE_ACCESS_CODE` environment variable:
 
 **Engine-level protection:**
 - `engine.get_state(include_sensitive=True)` - requires unlock
@@ -67,5 +69,5 @@ All sensitive operations are protected by lock code `1211`:
 - `/unlock` - POST endpoint to unlock with code
 - `/lock` - POST endpoint to lock access
 
-**Environment override:**
-You can override the default code `1211` by setting `SB688_SENSITIVE_ACCESS_CODE`.
+**Environment configuration:**
+Set `SB688_SENSITIVE_ACCESS_CODE` to your chosen access code before starting.

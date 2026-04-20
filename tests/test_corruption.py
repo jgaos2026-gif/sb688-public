@@ -6,6 +6,7 @@ import pytest
 
 from kernel.SB688_ENGINE import SB688Engine
 from kernel.VERA_GATE_RUNTIME import VERAGate, VeraBlockedError
+from tests.conftest import TEST_ACCESS_CODE
 
 
 def test_inject_99_8_percent_corruption() -> None:
@@ -82,7 +83,7 @@ def test_sensitive_state_and_export_locked_by_code() -> None:
         engine.export_proof(format="json")
 
     assert not engine.unlock_sensitive_access("0000")
-    assert engine.unlock_sensitive_access("1211")
+    assert engine.unlock_sensitive_access(TEST_ACCESS_CODE)
 
     unlocked_state = engine.get_state(include_sensitive=True)
     assert unlocked_state["bricks"][0]["data"] != "LOCKED"
@@ -94,20 +95,20 @@ def test_sensitive_unlock_attempt_limit() -> None:
     engine = SB688Engine()
     for _ in range(5):
         assert not engine.unlock_sensitive_access("0000")
-    assert not engine.unlock_sensitive_access("1211")
+    assert not engine.unlock_sensitive_access(TEST_ACCESS_CODE)
 
 
 def test_sensitive_unlock_resets_attempt_counter_after_success() -> None:
     engine = SB688Engine()
     for _ in range(4):
         assert not engine.unlock_sensitive_access("0000")
-    assert engine.unlock_sensitive_access("1211")
+    assert engine.unlock_sensitive_access(TEST_ACCESS_CODE)
     engine.lock_sensitive_access()
     for _ in range(4):
         assert not engine.unlock_sensitive_access("0000")
-    assert engine.unlock_sensitive_access("1211")
+    assert engine.unlock_sensitive_access(TEST_ACCESS_CODE)
 
 
 def test_sensitive_unlock_rejects_non_string_code() -> None:
     engine = SB688Engine()
-    assert not engine.unlock_sensitive_access(1211)  # type: ignore[arg-type]
+    assert not engine.unlock_sensitive_access(9999)  # type: ignore[arg-type]

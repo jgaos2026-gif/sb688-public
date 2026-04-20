@@ -34,7 +34,7 @@ class SB688Engine:
         self.vera = VERAGate()
         self._checkpoints: list[tuple[str, dict]] = []
         self._corruption_seed = 0
-        self._sensitive_access_code = os.environ.get("SB688_SENSITIVE_ACCESS_CODE", "1211")
+        self._sensitive_access_code = os.environ.get("SB688_SENSITIVE_ACCESS_CODE", "")
         self._sensitive_access_granted = False
         self._unlock_attempts = 0
         self._max_unlock_attempts = 5

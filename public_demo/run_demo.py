@@ -1,8 +1,24 @@
 #!/usr/bin/env python3
+"""SB-688 Public Demo — Full resilience cycle.
 
+Demonstrates:
+  1. System initialization
+  2. 99.8% corruption injection
+  3. VERA detection
+  4. Autonomous healing
+  5. Integrity verification
+  6. Proof export (requires access code via environment variable)
+
+Usage:
+    python public_demo/run_demo.py
+
+To export proof artifacts, set the SB688_SENSITIVE_ACCESS_CODE
+environment variable before running.
+"""
+
+import os
 import sys
 import time
-import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -59,16 +75,17 @@ def main() -> None:
     print(f"Braid status: {engine.braid_status()}")
     print(f"Data integrity: {'VERIFIED' if is_valid else 'FAILED'}")
 
+    # Proof export requires access code via environment variable
     access_code = os.environ.get("SB688_SENSITIVE_ACCESS_CODE")
-    if not access_code:
+    if access_code:
+        engine.unlock_sensitive_access(access_code)
+        with open("proof.json", "w", encoding="utf-8") as handle:
+            handle.write(engine.export_proof(format="json"))
+        with open("proof.csv", "w", encoding="utf-8") as handle:
+            handle.write(engine.export_proof(format="csv"))
+        print("Proof exported: proof.json, proof.csv")
+    else:
         print("Set SB688_SENSITIVE_ACCESS_CODE to export proof artifacts.")
-        return
-    engine.unlock_sensitive_access(access_code)
-    with open("proof.json", "w", encoding="utf-8") as handle:
-        handle.write(engine.export_proof(format="json"))
-    with open("proof.csv", "w", encoding="utf-8") as handle:
-        handle.write(engine.export_proof(format="csv"))
-    print("Proof exported: proof.json, proof.csv")
 
 
 if __name__ == "__main__":
