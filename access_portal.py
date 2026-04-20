@@ -47,8 +47,9 @@ class AccessPortal:
     }
 
     # Repository URLs (update these with actual private repo URL)
-    PRIVATE_REPO_FULL = "https://github.com/YOUR-ORG/sb688-private"  # Replace with actual URL
-    PRIVATE_REPO_DEMO = "https://github.com/YOUR-ORG/sb688-demo"     # Replace with actual URL
+    # TODO: Replace jgaos2026-gif with your GitHub username after creating private repo
+    PRIVATE_REPO_FULL = "https://github.com/jgaos2026-gif/sb688-private"
+    PRIVATE_REPO_DEMO = "https://github.com/jgaos2026-gif/sb688-private"  # Can use same or separate demo repo
 
     # Token validity period (in seconds)
     TOKEN_LIFETIME = 3600  # 1 hour
