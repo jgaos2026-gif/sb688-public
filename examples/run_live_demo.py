@@ -2,6 +2,7 @@
 
 import sys
 import time
+import os
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -58,6 +59,7 @@ def main() -> None:
     print(f"Braid status: {engine.braid_status()}")
     print(f"Data integrity: {'VERIFIED' if is_valid else 'FAILED'}")
 
+    engine.unlock_sensitive_access(os.environ.get("SB688_SENSITIVE_ACCESS_CODE", "1211"))
     with open("proof.json", "w", encoding="utf-8") as handle:
         handle.write(engine.export_proof(format="json"))
     with open("proof.csv", "w", encoding="utf-8") as handle:

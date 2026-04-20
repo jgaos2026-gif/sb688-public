@@ -66,3 +66,48 @@ def test_vera_blocks_unsafe_commit() -> None:
     for _ in engine.heal_from_spine():
         pass
     assert vera.can_commit_state(engine.get_state())
+
+
+def test_sensitive_state_and_export_locked_by_code() -> None:
+    engine = SB688Engine()
+
+    state = engine.get_state()
+    assert 0 in state["bricks"]
+    assert state["bricks"][0]["data"] == "LOCKED"
+
+    with pytest.raises(PermissionError):
+        engine.get_state(include_sensitive=True)
+
+    with pytest.raises(PermissionError):
+        engine.export_proof(format="json")
+
+    assert not engine.unlock_sensitive_access("0000")
+    assert engine.unlock_sensitive_access("1211")
+
+    unlocked_state = engine.get_state(include_sensitive=True)
+    assert unlocked_state["bricks"][0]["data"] != "LOCKED"
+    assert bytes.fromhex(unlocked_state["bricks"][0]["data"])
+    assert engine.export_proof(format="json").startswith("[")
+
+
+def test_sensitive_unlock_attempt_limit() -> None:
+    engine = SB688Engine()
+    for _ in range(5):
+        assert not engine.unlock_sensitive_access("0000")
+    assert not engine.unlock_sensitive_access("1211")
+
+
+def test_sensitive_unlock_resets_attempt_counter_after_success() -> None:
+    engine = SB688Engine()
+    for _ in range(4):
+        assert not engine.unlock_sensitive_access("0000")
+    assert engine.unlock_sensitive_access("1211")
+    engine.lock_sensitive_access()
+    for _ in range(4):
+        assert not engine.unlock_sensitive_access("0000")
+    assert engine.unlock_sensitive_access("1211")
+
+
+def test_sensitive_unlock_rejects_non_string_code() -> None:
+    engine = SB688Engine()
+    assert not engine.unlock_sensitive_access(1211)  # type: ignore[arg-type]
