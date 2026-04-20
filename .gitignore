@@ -26,3 +26,7 @@ proof.csv
 # OS
 .DS_Store
 Thumbs.db
+
+# Access Portal (tokens should never be committed)
+.access_tokens.json
+.token_*.json
