@@ -48,6 +48,7 @@ python public_demo/run_demo.py
 ├── nodes/              # Node network layer
 ├── governance/         # Governance documents
 ├── deploy/             # Docker deployment
+├── demo/               # Browser-based live resilience demo
 └── tests/              # Test suite
 ```
 
@@ -59,6 +60,19 @@ python public_demo/run_demo.py
 - [Whitepaper](docs_public/WHITEPAPER.md)
 - [Code of Conduct](docs_public/CODE_OF_CONDUCT.md)
 - [Functional Runtime](README_FUNCTIONAL.md)
+
+## Kernel Documents
+- [Protected Spine](kernel/SB688_KERNEL.md)
+- [Implementation Guide](kernel/IMPLEMENTATION_GUIDE.md)
+- [Kernel Manifest](kernel/KERNEL_MANIFEST.json)
+- [Constitution](governance/CONSTITUTION.md)
+- [VERA Protocol](governance/VERA_PROTOCOL.md)
+- [Ledger Protocol](governance/LEDGER_PROTOCOL.md)
+- [Healing Loop](governance/HEALING_LOOP.md)
+
+## Live Demo
+- [SB-688 Live Resilience Demo](demo/index.html)
+- [Demo Usage Guide](demo/README.md)
 
 ## Proof of Concept
 

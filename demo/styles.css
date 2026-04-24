@@ -1,0 +1,166 @@
+:root {
+  --bg: #000000;
+  --panel: #0a0a0a;
+  --border: #1d1d1d;
+  --green: #00ff00;
+  --red: #ff0000;
+  --yellow: #ffff00;
+  --blue: #0080ff;
+  --cyan: #00ffff;
+  --text: #f0f0f0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, Segoe UI, system-ui, sans-serif;
+}
+
+.app {
+  display: grid;
+  grid-template-columns: 3fr 5fr 2fr;
+  min-height: 100vh;
+}
+
+.panel {
+  border-right: 1px solid var(--border);
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.panel:last-child {
+  border-right: 0;
+}
+
+.panel-header {
+  padding: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+}
+
+.button-row,
+.control-stack {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.control-stack {
+  flex-direction: column;
+  padding: 12px;
+}
+
+button {
+  border: 1px solid var(--border);
+  background: #141414;
+  color: var(--text);
+  padding: 10px 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 150ms ease-in-out;
+}
+
+button:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+
+button.danger {
+  border-color: var(--red);
+  color: var(--red);
+}
+button.healing {
+  border-color: var(--green);
+  color: var(--green);
+}
+button.neutral {
+  border-color: var(--blue);
+  color: var(--blue);
+}
+
+.ledger-stream {
+  flex: 1;
+  overflow: auto;
+  padding: 10px 12px 20px;
+  font-family: Monaco, "Courier New", monospace;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.ledger-row {
+  white-space: nowrap;
+  margin-bottom: 6px;
+}
+
+.line-no {
+  color: #888;
+}
+
+.phase-init {
+  color: var(--blue);
+}
+.phase-corrupt {
+  color: var(--red);
+}
+.phase-heal {
+  color: var(--green);
+}
+.phase-verify {
+  color: var(--yellow);
+}
+
+.metrics {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  font-family: Monaco, "Courier New", monospace;
+  font-size: 12px;
+}
+
+#viz-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.status {
+  margin: 6px 12px 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  display: grid;
+  gap: 8px;
+  font-family: Monaco, "Courier New", monospace;
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .app {
+    grid-template-columns: 1fr;
+  }
+  .panel {
+    min-height: 34vh;
+  }
+  .panel-ledger {
+    order: 2;
+  }
+  .panel-controls {
+    order: 3;
+  }
+  .panel-visual {
+    order: 1;
+  }
+}
