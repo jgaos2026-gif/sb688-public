@@ -96,6 +96,7 @@ export class SB688Ledger {
     document.body.appendChild(a);
     a.click();
     setTimeout(() => {
+      // Defer cleanup until after the browser has processed the click and started the download
       URL.revokeObjectURL(objectUrl);
       a.remove();
     }, 0);
