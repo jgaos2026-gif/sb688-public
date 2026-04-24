@@ -20,7 +20,31 @@ clockTick();
 function renderLedger(entry, lineNo) {
   const row = document.createElement("div");
   row.className = `ledger-row ${phaseClass(entry.phase)}`;
-  row.innerHTML = `<span class="line-no">${lineNo.toString().padStart(4, "0")}</span> <span class="ts">[${entry.timestamp}]</span> <span class="event">${entry.event_type}</span> <span class="msg">${entry.message}</span>`;
+
+  const lineNoEl = document.createElement("span");
+  lineNoEl.className = "line-no";
+  lineNoEl.textContent = lineNo.toString().padStart(4, "0");
+
+  const timestampEl = document.createElement("span");
+  timestampEl.className = "ts";
+  timestampEl.textContent = `[${entry.timestamp}]`;
+
+  const eventEl = document.createElement("span");
+  eventEl.className = "event";
+  eventEl.textContent = entry.event_type;
+
+  const messageEl = document.createElement("span");
+  messageEl.className = "msg";
+  messageEl.textContent = entry.message;
+
+  row.appendChild(lineNoEl);
+  row.appendChild(document.createTextNode(" "));
+  row.appendChild(timestampEl);
+  row.appendChild(document.createTextNode(" "));
+  row.appendChild(eventEl);
+  row.appendChild(document.createTextNode(" "));
+  row.appendChild(messageEl);
+
   ledgerEl.appendChild(row);
   ledgerEl.scrollTop = ledgerEl.scrollHeight;
 }

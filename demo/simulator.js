@@ -99,6 +99,7 @@ export class Simulator {
     this.syncViz(performance.now() - this.sequenceStartedAt);
 
     this.phase = "DETECT";
+    this.syncViz(performance.now() - this.sequenceStartedAt);
     await this.ledger.append({
       phase: "DETECT",
       event_type: "VERA_DETECT",
@@ -176,6 +177,17 @@ export class Simulator {
     this.syncViz(performance.now() - this.sequenceStartedAt);
     await this.wait(200);
     const chain = await this.ledger.verifyChain();
+    if (!chain.valid) {
+      await this.ledger.append({
+        phase: "VERIFY",
+        event_type: "VERIFICATION_FAILED",
+        health: this.health,
+        braid_status: this.braidStatus,
+        message: `VERIFICATION_FAILED: ${chain.reason}`,
+        data: { chain_valid: false, reason: chain.reason, verification_duration_ms: 200 },
+      });
+      return;
+    }
     await this.ledger.append({
       phase: "VERIFY",
       event_type: "VERIFICATION_PASSED",

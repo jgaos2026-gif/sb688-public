@@ -90,10 +90,15 @@ export class SB688Ledger {
     const isCsv = format === "csv";
     const blob = new Blob([isCsv ? this.toCSV() : this.toJSON()], { type: isCsv ? "text/csv" : "application/json" });
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
+    const objectUrl = URL.createObjectURL(blob);
+    a.href = objectUrl;
     a.download = `sb688-ledger-${new Date().toISOString().replace(/[:.]/g, "-")}.${isCsv ? "csv" : "json"}`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(a.href);
+    setTimeout(() => {
+      URL.revokeObjectURL(objectUrl);
+      a.remove();
+    }, 0);
   }
 }
 

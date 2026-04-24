@@ -109,9 +109,12 @@ export class Visualization {
     ctx.fillStyle = COLORS.bg;
     ctx.fillRect(0, 0, w, h);
 
+    const braidWidth = Math.max(0, w - 300);
+    const bricksWidth = Math.max(0, Math.min(w - 170, 760));
+    const bricksHeight = Math.max(0, h - 320);
     this.drawGauge(130, 130, 84);
-    this.drawBraid(260, 70, w - 300, 180);
-    this.drawBricks(120, 270, Math.min(w - 170, 760), h - 320);
+    this.drawBraid(260, 70, braidWidth, 180);
+    this.drawBricks(120, 270, bricksWidth, bricksHeight);
     this.drawGhostNodes();
     this.drawScanWave();
   }
