@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Hexagon background -->
+  <defs>
+    <linearGradient id="goldGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f4d03f;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d4af37;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+
+  <!-- Hexagon shape -->
+  <polygon points="100,10 170,50 170,130 100,170 30,130 30,50"
+           fill="none" stroke="url(#goldGrad)" stroke-width="3"/>
+
+  <!-- Lion silhouette in center -->
+  <g transform="translate(100, 80)">
+    <!-- Lion head with mane -->
+    <circle cx="0" cy="0" r="25" fill="url(#goldGrad)" opacity="0.3"/>
+    <ellipse cx="0" cy="0" rx="18" ry="20" fill="#d4af37"/>
+    <!-- Mane points -->
+    <path d="M-18,-5 L-22,-12 M-15,-15 L-18,-22 M-8,-18 L-8,-25 M0,-20 L0,-27 M8,-18 L8,-25 M15,-15 L18,-22 M18,-5 L22,-12"
+          stroke="#d4af37" stroke-width="2" fill="none"/>
+    <!-- Eyes -->
+    <circle cx="-6" cy="-3" r="2" fill="#000"/>
+    <circle cx="6" cy="-3" r="2" fill="#000"/>
+    <!-- Nose and mouth -->
+    <path d="M0,3 L-3,7 M0,3 L3,7 M-5,10 Q0,12 5,10" stroke="#000" stroke-width="1.5" fill="none"/>
+    <!-- Body suggestion -->
+    <path d="M-12,15 L-15,25 M12,15 L15,25 M0,18 L0,28" stroke="#d4af37" stroke-width="2.5"/>
+  </g>
+
+  <!-- JGA text in Old English style -->
+  <text x="100" y="155" font-family="'Blackletter', 'Old English Text MT', 'UnifrakturCook', serif"
+        font-size="32" font-weight="bold" fill="url(#goldGrad)" text-anchor="middle" letter-spacing="2">
+    JGA
+  </text>
+</svg>

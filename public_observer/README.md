@@ -1,5 +1,9 @@
 # SB-688 Public Observer
 
+<p align="center">
+  <img src="../logo-banner.svg" alt="Jay's Graphic Arts" width="500"/>
+</p>
+
 > **Observer Mode** — You are viewing the public proof layer of the SB-688
 > Sovereign Alignment Kernel.
 
@@ -68,4 +72,11 @@ python public_demo/teaser_snippet.py
 
 ---
 
-*SB-688 — Sovereign Alignment Kernel — Observer Mode*
+<p align="center">
+  <strong>SB-688 — Sovereign Alignment Kernel — Observer Mode</strong><br/>
+  <em>Jay's Graphic Arts / National Resilience Council</em>
+</p>
+
+<p align="center">
+  <img src="../demo/logo.svg" alt="JGA Logo" width="100"/>
+</p>

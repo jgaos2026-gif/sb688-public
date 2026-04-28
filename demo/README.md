@@ -1,5 +1,9 @@
 # SB-688 Live Resilience Demo
 
+<p align="center">
+  <img src="../logo-banner.svg" alt="Jay's Graphic Arts" width="500"/>
+</p>
+
 ## Run
 
 Open `demo/index.html` in any modern browser (or serve repo root with a static server).
@@ -29,7 +33,8 @@ Open `demo/index.html` in any modern browser (or serve repo root with a static s
 
 ## Color system
 
-- `INIT` = Blue (`#0080FF`)
+- `INIT` = Gold (`#D4AF37`)
 - `CORRUPT/DETECT/ISOLATE` = Red (`#FF0000`)
 - `ROLLBACK/HEAL/COMPLETE` = Green (`#00FF00`)
 - `VERIFY` = Yellow (`#FFFF00`)
+- Primary theme: Black (`#000000`) and Gold (`#D4AF37`)
