@@ -1,5 +1,9 @@
 # SB-688 Kernel Implementation Guide
 
+<p align="center">
+  <img src="../logo-banner.svg" alt="Jay's Graphic Arts" width="600"/>
+</p>
+
 ## 1) Drop-in System Prompt
 Use `examples/sb688_system_prompt.txt` directly for OpenAI, Claude, or custom orchestration.
 
@@ -42,3 +46,14 @@ Detect -> isolate -> rollback -> restitch from `kernel/SB688_KERNEL.md` -> re-ru
 - Chat flow: `examples/dual_path_verification.py`
 - Batch/audit flow: `examples/ledger_client.py`, `examples/healing_loop.py`
 - HTTP invocation pattern: `examples/curl_request.sh`
+
+---
+
+<p align="center">
+  <strong>SB-688 — Sovereign Alignment Kernel</strong><br/>
+  <em>Jay's Graphic Arts / National Resilience Council</em>
+</p>
+
+<p align="center">
+  <img src="../demo/logo.svg" alt="JGA Logo" width="100"/>
+</p>
