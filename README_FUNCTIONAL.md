@@ -1,5 +1,9 @@
 # SB-688 Functional Runtime
 
+<p align="center">
+  <img src="./logo-banner.svg" alt="Jay's Graphic Arts" width="500"/>
+</p>
+
 ## Run single-node demo
 
 ```bash

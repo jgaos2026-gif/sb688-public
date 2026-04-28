@@ -1,13 +1,16 @@
 :root {
   --bg: #000000;
   --panel: #0a0a0a;
-  --border: #1d1d1d;
+  --border: #d4af37;
   --green: #00ff00;
   --red: #ff0000;
   --yellow: #ffff00;
   --blue: #0080ff;
   --cyan: #00ffff;
-  --text: #f0f0f0;
+  --text: #d4af37;
+  --gold: #d4af37;
+  --gold-light: #f4d03f;
+  --gold-dark: #b8960f;
 }
 
 * {
@@ -20,6 +23,41 @@ body {
   color: var(--text);
   font-family: Inter, Segoe UI, system-ui, sans-serif;
 }
+
+.site-header {
+  background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
+  border-bottom: 2px solid var(--gold);
+  padding: 20px 40px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.logo {
+  width: 80px;
+  height: 80px;
+  flex-shrink: 0;
+}
+
+.branding {
+  flex: 1;
+}
+
+.brand-title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: 0.05em;
+}
+
+.brand-tagline {
+  margin: 5px 0 0 0;
+  font-size: 14px;
+  color: var(--gold-dark);
+  font-style: italic;
+}
+
 
 .app {
   display: grid;
@@ -49,6 +87,7 @@ h2 {
   margin: 0;
   font-size: 16px;
   letter-spacing: 0.08em;
+  color: var(--gold);
 }
 
 .button-row,
@@ -74,8 +113,8 @@ button {
 }
 
 button:hover {
-  border-color: var(--cyan);
-  color: var(--cyan);
+  border-color: var(--gold-light);
+  color: var(--gold-light);
 }
 
 button.danger {
@@ -87,8 +126,8 @@ button.healing {
   color: var(--green);
 }
 button.neutral {
-  border-color: var(--blue);
-  color: var(--blue);
+  border-color: var(--gold);
+  color: var(--gold);
 }
 
 .ledger-stream {
@@ -110,7 +149,7 @@ button.neutral {
 }
 
 .phase-init {
-  color: var(--blue);
+  color: var(--gold);
 }
 .phase-corrupt {
   color: var(--red);
