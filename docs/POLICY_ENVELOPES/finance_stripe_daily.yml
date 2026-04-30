@@ -1,0 +1,50 @@
+policy_id: FINANCE_STRIPE_DAILY_RECONCILIATION
+version: 1
+
+scope:
+  systems:
+    - stripe
+    - bluevine
+
+schedule:
+  cadence: daily
+  run_time_local: "06:00"
+  timezone: "America/Chicago"  # configure per deployment
+lookback_days: 3
+
+matching:
+  primary_key: stripe_payout_id
+  match_on:
+    - bank_amount_equals_net_payout
+    - date_window_banking_days: 2
+
+tolerance:
+  currency: USD
+  auto_verify_delta_max: 0.00
+  auto_commit_watch_delta_max: 1.00
+
+actions:
+  on_verified:
+    - commit_ledger_entry
+    - update_recon_index
+  on_watch:
+    - commit_ledger_entry
+    - flag_for_review_digest
+  on_exception:
+    - create_exception_record
+    - if_persist_days_gte: 2
+      then:
+        - quarantine_finance
+        - notify_crown
+
+quarantine:
+  name: QUARANTINE_FINANCE
+  effects:
+    - disable_auto_refunds: true
+    - disable_auto_vendor_payments: true
+    - allow_readonly_reconciliation: true
+
+evidence_labels:
+  verified: VERIFIED
+  watch: MEASURED
+  exception: OBSERVED

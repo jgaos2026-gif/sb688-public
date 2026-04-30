@@ -39,6 +39,20 @@ SB689 OMEGA stitches two layers into one resilience runtime:
 | [Attribution](ATTRIBUTION) | Concept attribution |
 | [Press Kit](PRESS_KIT) | Public observer kit |
 
+### Policy Envelopes
+
+| Policy | Description |
+|--------|-------------|
+| [Finance — Stripe Daily Reconciliation](POLICY_ENVELOPES/finance_stripe_daily.yml) | Daily Stripe→Bluevine reconciliation envelope |
+| [Stripe Refund Window](POLICY_ENVELOPES/stripe_refunds.yml) | 24 h timestamp-based refund window policy |
+
+### Ledger Templates
+
+| Template | Description |
+|----------|-------------|
+| [Stripe→Bluevine Reconcile Entry](LEDGER_TEMPLATES/LEDGER_ENTRY_STRIPE_BLUEVINE_RECONCILE.json) | Ledger entry template for daily payout reconciliation |
+| [Stripe Refund Decision Entry](LEDGER_TEMPLATES/LEDGER_ENTRY_STRIPE_REFUND_DECISION.json) | Ledger entry template for refund decisions |
+
 ---
 
 ## Targets
