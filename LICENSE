@@ -1,0 +1,61 @@
+SB689 OMEGA — DUAL LICENSE
+==========================
+
+Copyright (c) 2026 John Arenz (J.G.A.). All rights reserved.
+
+This repository is dual-licensed.
+
+----------------------------------------------------------------------
+1. SOURCE-AVAILABLE REFERENCE LICENSE (this repository)
+----------------------------------------------------------------------
+
+The TypeScript source under `src/`, `test/`, `demo/`, `docs/`, and the
+top-level configuration files are made available under the following
+terms:
+
+You may, at no charge:
+  (a) read, study, and run the code locally;
+  (b) modify the code for personal evaluation, research, or
+      educational use;
+  (c) submit improvements as pull requests under
+      CONTRIBUTING.md and GOVERNANCE.md.
+
+You may NOT, without a separate written commercial license from the
+Architect:
+  (d) use any portion of this repository in a commercial product or
+      service;
+  (e) use the names "SB689", "SB688", "Sovereign Stitch", "Sovereign
+      Spine", "Brick Stitch", "Ghost Node", "Liquid Truth Node Mesh",
+      "Conscious Brick", "Stem Tri-Braid", "Elegance UI Crown",
+      "National Resilience Council", or any confusingly similar mark
+      in connection with goods or services;
+  (f) re-license the contents of this repository under different terms;
+  (g) remove or alter the attribution headers or the white-paper
+      evidence labels.
+
+The Architect retains all rights not expressly granted above,
+including but not limited to the architecture, the patterns, the
+naming system, the brand identity ("Black & Gold, 5-Pt Crown"), the
+white-paper, and any heuristics, weights, prompts, signing schemes,
+or adapter content not published in this repository.
+
+----------------------------------------------------------------------
+2. COMMERCIAL LICENSE (separate agreement)
+----------------------------------------------------------------------
+
+Commercial use, OEM integration, or sublicensing of any kind requires
+a separate written agreement with John Arenz (J.G.A.). Contact via
+the channel listed on https://www.jgaos2026-gif.com.
+
+----------------------------------------------------------------------
+DISCLAIMER
+----------------------------------------------------------------------
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND
+NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHOR OR COPYRIGHT HOLDER BE
+LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

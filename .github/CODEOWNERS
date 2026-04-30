@@ -1,0 +1,17 @@
+# CODEOWNERS — SB689 OMEGA · Sovereign Stitch
+# All changes to these paths require Architect (J.G.A.) approval.
+# Replace @jga2026 with your actual GitHub username.
+
+# Protocol-layer (Class A) — Architect owns everything by default
+*                                   @jga2026
+
+# Explicitly lock the most sensitive paths
+src/spine/                          @jga2026
+src/omega/SovereignStitch.ts        @jga2026
+src/omega/SeedBrick.ts              @jga2026
+src/ledger/                         @jga2026
+src/contracts/                      @jga2026
+docs/WHITEPAPER.md                  @jga2026
+docs/GOVERNANCE.md                  @jga2026
+LICENSE                             @jga2026
+NOTICE                              @jga2026

@@ -1,0 +1,19 @@
+# Files excluded from the published source archive (npm pack / git archive).
+# These items remain in the working tree but are stripped from public tarballs.
+
+private/        export-ignore
+proprietary/    export-ignore
+secrets/        export-ignore
+brain-content/  export-ignore
+signing-keys/   export-ignore
+customer-deployments/ export-ignore
+.env            export-ignore
+.env.*          export-ignore
+*.private.ts    export-ignore
+*.private.json  export-ignore
+*.private.md    export-ignore
+
+# Normalize line endings.
+*.ts            text eol=lf
+*.json          text eol=lf
+*.md            text eol=lf

@@ -1,0 +1,42 @@
+{
+  "name": "sb689-braided-runtime",
+  "version": "1.1.1",
+  "description": "SB689 OMEGA / SB688 stitched TypeScript runtime — spine-governed braided execution with Sovereign Stitch resilience supervisor.",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
+  "files": [
+    "dist",
+    "src",
+    "docs",
+    "LICENSE",
+    "NOTICE",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/test/**/*.test.js",
+    "demo": "npm run build && node dist/demo/runDemo.js",
+    "system": "npm run build && node dist/demo/runSystem.js",
+    "system:dev": "npm run system",
+    "clean": "rimraf dist || rm -rf dist"
+  },
+  "keywords": [
+    "sb689",
+    "sb688",
+    "sovereign-stitch",
+    "resilience",
+    "ghost-node",
+    "audit-ledger",
+    "braided-runtime",
+    "typescript",
+    "jga"
+  ],
+  "author": "John Arenz (J.G.A.)",
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://www.jgaos2026-gif.com",
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": ">=5.0.0"
+  }
+}

@@ -1,0 +1,29 @@
+# NOTICE — Intellectual Property & Trademarks
+
+The following names, marks, and concepts are the intellectual property
+of **John Arenz (J.G.A.)** and may not be used in commerce without a
+separate written license:
+
+- SB689 · SB689 OMEGA · SB688
+- Sovereign Stitch™
+- Sovereign Spine™
+- Brick Stitch™
+- Ghost Node™ (in the SB688/SB689 sense)
+- Liquid Truth Node Mesh™
+- Conscious Brick™
+- Stem Tri-Braid™
+- Elegance UI Crown™ (Black & Gold, 5-Pt Crown trade dress)
+- National Resilience Council™ (in the J.G.A. sense)
+
+Use of these marks in this repository is for descriptive,
+implementation-reference purposes only and does not transfer any
+trademark rights to any contributor or downstream user.
+
+The white paper at [docs/WHITEPAPER.md](docs/WHITEPAPER.md), the
+attribution at [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md), and the
+license at [LICENSE](LICENSE) together govern public use.
+
+Production heuristics, weights, brain content, signing keys,
+customer-specific stitch deployments, and any internal documents
+labeled "PRIVATE" are **not** part of this public repository and
+remain the exclusive property of the Architect.
