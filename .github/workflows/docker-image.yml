@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: write  # required for cache-to: type=gha (GHA layer-cache writes)
 
 jobs:
 
