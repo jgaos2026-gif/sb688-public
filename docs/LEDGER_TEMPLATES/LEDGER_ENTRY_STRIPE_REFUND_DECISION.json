@@ -1,0 +1,24 @@
+{
+  "action_type": "STRIPE_REFUND_DECISION",
+  "evidence_label": "VERIFIED",
+  "refs": {
+    "stripe_charge_id": "ch_...",
+    "stripe_payment_intent_id": "pi_...",
+    "stripe_refund_id": null
+  },
+  "timestamps": {
+    "charge_created_at": "YYYY-MM-DDTHH:MM:SSZ",
+    "decision_at": "YYYY-MM-DDTHH:MM:SSZ",
+    "window_expires_at": "YYYY-MM-DDTHH:MM:SSZ"
+  },
+  "policy": {
+    "policy_id": "STRIPE_REFUND_WINDOW",
+    "time_basis": "stripe.charge.created",
+    "evaluation_clock": "utc",
+    "hard_deadline_hours": 24,
+    "decision": "DENY",
+    "reason": "Refund window exceeded"
+  },
+  "prev_hash": "",
+  "hash": ""
+}
