@@ -1,0 +1,24 @@
+policy_id: STRIPE_REFUND_WINDOW
+version: 2
+
+time_basis:
+  source: stripe.charge.created   # unix timestamp / ISO time from Stripe
+  evaluation_clock: utc
+  window_hours: 24
+
+refunds:
+  auto_refunds_enabled: false     # approval required
+  within_window:
+    decision: PERMIT_WITH_APPROVAL
+  after_window:
+    decision: DENY
+    allow_human_override: false
+
+required_logging:
+  ledger_action_type: STRIPE_REFUND_DECISION
+  evidence_required:
+    - stripe_charge_id
+    - stripe_payment_intent_id
+    - charge_created_at
+    - decision_timestamp
+    - decision_reason
