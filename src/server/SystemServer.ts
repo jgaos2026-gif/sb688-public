@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { IntegratedSystem } from "../system/IntegratedSystem";
+import { AgentBrick } from "../agent/AgentBrick";
 
 export interface SystemServerOptions {
   readonly host?: string;
@@ -11,10 +12,11 @@ export function startSystemServer(options: SystemServerOptions = {}): void {
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 6890;
   const system = new IntegratedSystem({ seedState: options.seedState });
+  const agent = new AgentBrick();
 
   const server = createServer(async (request, response) => {
     try {
-      await routeRequest(system, request, response);
+      await routeRequest(system, agent, request, response);
     } catch (error) {
       sendJson(response, 500, {
         ok: false,
@@ -30,6 +32,7 @@ export function startSystemServer(options: SystemServerOptions = {}): void {
 
 async function routeRequest(
   system: IntegratedSystem,
+  agent: AgentBrick,
   request: IncomingMessage,
   response: ServerResponse
 ): Promise<void> {
@@ -124,6 +127,62 @@ async function routeRequest(
     );
 
     sendJson(response, 200, { ok: true, result, ledgerValid: system.ledgerValid() });
+    return;
+  }
+
+  if (method === "GET" && url === "/api/agent/status") {
+    sendJson(response, 200, { ok: true, agent: agent.status() });
+    return;
+  }
+
+  if (method === "POST" && url === "/api/agent/configure") {
+    const body = await readJsonBody(request);
+    agent.configure({
+      name: typeof body.name === "string" ? body.name : undefined,
+      persona: typeof body.persona === "string" ? body.persona : undefined,
+      avatarDataUrl: typeof body.avatarDataUrl === "string" ? body.avatarDataUrl : undefined
+    });
+    sendJson(response, 200, { ok: true, agent: agent.status() });
+    return;
+  }
+
+  if (method === "POST" && url === "/api/agent/communicate") {
+    const body = await readJsonBody(request);
+    const message = typeof body.message === "string" ? body.message.trim() : "";
+    if (message.length === 0) {
+      sendJson(response, 400, { ok: false, error: "Field 'message' is required." });
+      return;
+    }
+    sendJson(response, 200, { ok: true, result: agent.communicate({ message }) });
+    return;
+  }
+
+  if (method === "POST" && url === "/api/agent/decide") {
+    const body = await readJsonBody(request);
+    const question = typeof body.question === "string" ? body.question.trim() : "";
+    const options = Array.isArray(body.options)
+      ? (body.options as unknown[]).filter((o): o is string => typeof o === "string" && o.trim().length > 0)
+      : [];
+    if (question.length === 0) {
+      sendJson(response, 400, { ok: false, error: "Field 'question' is required." });
+      return;
+    }
+    if (options.length < 2) {
+      sendJson(response, 400, { ok: false, error: "At least two non-empty options are required." });
+      return;
+    }
+    sendJson(response, 200, { ok: true, result: agent.decide({ question, options }) });
+    return;
+  }
+
+  if (method === "POST" && url === "/api/agent/advise") {
+    const body = await readJsonBody(request);
+    const query = typeof body.query === "string" ? body.query.trim() : "";
+    if (query.length === 0) {
+      sendJson(response, 400, { ok: false, error: "Field 'query' is required." });
+      return;
+    }
+    sendJson(response, 200, { ok: true, result: agent.advise({ query }) });
     return;
   }
 
@@ -238,6 +297,56 @@ const INDEX_HTML = `<!doctype html>
         <h2>Ledger</h2>
         <button id="refreshLedger" class="btn">Refresh Ledger</button>
         <pre id="ledgerResult">No ledger data loaded.</pre>
+      </section>
+
+      <section class="panel agent-panel" id="agentScreen">
+        <header class="agent-header">
+          <div class="agent-avatar-wrap">
+            <div class="agent-avatar" id="agentAvatarPreview" aria-label="Agent avatar preview">
+              <span class="agent-avatar-placeholder" id="agentAvatarPlaceholder">&#129776;</span>
+              <img id="agentAvatarImg" src="" alt="Agent avatar" style="display:none;" />
+            </div>
+            <label class="btn agent-upload-btn" for="agentAvatarInput" title="Upload avatar image">
+              &#128247; Upload Avatar
+              <input id="agentAvatarInput" type="file" accept="image/*" aria-label="Upload agent avatar" />
+            </label>
+          </div>
+          <div class="agent-identity">
+            <h2 id="agentNameDisplay">Sovereign Agent</h2>
+            <p class="agent-persona-display" id="agentPersonaDisplay">A precise, logical, data-researched AI advisor.</p>
+            <div class="agent-config-row">
+              <input id="agentNameInput" class="agent-text-input" type="text" placeholder="Agent name" value="Sovereign Agent" aria-label="Agent name" />
+              <input id="agentPersonaInput" class="agent-text-input" type="text" placeholder="Agent persona" value="A precise, logical, data-researched AI advisor." aria-label="Agent persona" />
+              <button id="agentSaveConfig" class="btn btn-primary">Save Config</button>
+            </div>
+          </div>
+        </header>
+
+        <div class="agent-body grid">
+          <article class="panel agent-sub-panel">
+            <h3>&#128172; Communicate</h3>
+            <div class="agent-chat" id="agentChat" aria-live="polite" aria-label="Agent chat history"></div>
+            <div class="agent-chat-input-row">
+              <input id="agentMessageInput" class="agent-text-input" type="text" placeholder="Type a message…" aria-label="Chat message input" />
+              <button id="agentSendMessage" class="btn btn-primary">Send</button>
+            </div>
+          </article>
+
+          <article class="panel agent-sub-panel">
+            <h3>&#9878; Decide</h3>
+            <input id="agentDecideQuestion" class="agent-text-input" type="text" placeholder="Decision question…" aria-label="Decision question" />
+            <textarea id="agentDecideOptions" class="agent-textarea" rows="3" placeholder="Option A&#10;Option B&#10;Option C" aria-label="Decision options (one per line)"></textarea>
+            <button id="agentDecideBtn" class="btn btn-primary">Decide</button>
+            <pre id="agentDecideResult" class="agent-result">No decision yet.</pre>
+          </article>
+
+          <article class="panel agent-sub-panel">
+            <h3>&#128161; Advise</h3>
+            <textarea id="agentAdviseQuery" class="agent-textarea" rows="3" placeholder="Ask for advice on any topic…" aria-label="Advice query"></textarea>
+            <button id="agentAdviseBtn" class="btn btn-primary">Get Advice</button>
+            <pre id="agentAdviseResult" class="agent-result">No advice yet.</pre>
+          </article>
+        </div>
       </section>
     </main>
     <script src="/app.js" defer></script>
@@ -410,6 +519,177 @@ pre {
   to {
     opacity: 1;
   }
+}
+
+/* ── Agent Screen ──────────────────────────────────────────────────────────── */
+
+.agent-panel {
+  border-top: 3px solid var(--accent);
+}
+
+.agent-header {
+  display: flex;
+  gap: 1.2rem;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.agent-avatar-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.agent-avatar {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  border: 3px solid var(--accent);
+  background: linear-gradient(135deg, #0e2835, #1d5468);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.agent-avatar-placeholder {
+  font-size: 2.4rem;
+  line-height: 1;
+}
+
+.agent-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.agent-upload-btn {
+  font-size: 0.78rem;
+  padding: 0.35rem 0.6rem;
+  cursor: pointer;
+}
+
+.agent-upload-btn input[type="file"] {
+  display: none;
+}
+
+.agent-identity {
+  flex: 1;
+  min-width: 200px;
+}
+
+.agent-identity h2 {
+  margin-bottom: 0.2rem;
+  color: var(--ink);
+}
+
+.agent-persona-display {
+  color: var(--ink-soft);
+  font-style: italic;
+  margin: 0 0 0.6rem;
+  font-size: 0.9rem;
+}
+
+.agent-config-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.agent-text-input {
+  flex: 1;
+  min-width: 140px;
+  border-radius: 8px;
+  border: 1px solid var(--edge);
+  padding: 0.5rem 0.7rem;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.agent-textarea {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--edge);
+  padding: 0.6rem 0.8rem;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 0.88rem;
+  resize: vertical;
+  margin-bottom: 0.5rem;
+}
+
+.agent-body {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.agent-sub-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.agent-sub-panel h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.agent-chat {
+  min-height: 120px;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 0.6rem;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-bottom: 0.4rem;
+}
+
+.agent-chat-bubble {
+  padding: 0.4rem 0.7rem;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  max-width: 92%;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.agent-chat-bubble.user {
+  align-self: flex-end;
+  background: linear-gradient(120deg, var(--accent), #f2cb68);
+  color: #3d2400;
+}
+
+.agent-chat-bubble.agent {
+  align-self: flex-start;
+  background: #e8f3f7;
+  color: var(--ink);
+}
+
+.agent-chat-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.agent-chat-input-row .agent-text-input {
+  flex: 1;
+}
+
+.agent-result {
+  min-height: 80px;
+  max-height: 220px;
+  overflow: auto;
+  font-size: 0.82rem;
+  margin-top: 0.4rem;
 }`;
 
 const APP_JS = `const runtimeResult = document.getElementById("runtimeResult");
@@ -488,8 +768,120 @@ document.getElementById("tickOnly").addEventListener("click", tickOnly);
 document.getElementById("connectStitch").addEventListener("click", connectToStitch);
 document.getElementById("refreshLedger").addEventListener("click", refreshLedger);
 
+// ── Agent Screen ────────────────────────────────────────────────────────────
+
+const agentNameInput = document.getElementById("agentNameInput");
+const agentPersonaInput = document.getElementById("agentPersonaInput");
+const agentNameDisplay = document.getElementById("agentNameDisplay");
+const agentPersonaDisplay = document.getElementById("agentPersonaDisplay");
+const agentAvatarImg = document.getElementById("agentAvatarImg");
+const agentAvatarPlaceholder = document.getElementById("agentAvatarPlaceholder");
+const agentAvatarInput = document.getElementById("agentAvatarInput");
+const agentChat = document.getElementById("agentChat");
+const agentMessageInput = document.getElementById("agentMessageInput");
+const agentDecideQuestion = document.getElementById("agentDecideQuestion");
+const agentDecideOptions = document.getElementById("agentDecideOptions");
+const agentDecideResult = document.getElementById("agentDecideResult");
+const agentAdviseQuery = document.getElementById("agentAdviseQuery");
+const agentAdviseResult = document.getElementById("agentAdviseResult");
+
+function appendChatBubble(role, text) {
+  const bubble = document.createElement("div");
+  bubble.className = "agent-chat-bubble " + role;
+  bubble.textContent = text;
+  agentChat.appendChild(bubble);
+  agentChat.scrollTop = agentChat.scrollHeight;
+}
+
+agentAvatarInput.addEventListener("change", function () {
+  const file = agentAvatarInput.files && agentAvatarInput.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async function (event) {
+    const dataUrl = event.target.result;
+    agentAvatarImg.src = dataUrl;
+    agentAvatarImg.style.display = "block";
+    agentAvatarPlaceholder.style.display = "none";
+    try {
+      await callApi("/api/agent/configure", { avatarDataUrl: dataUrl });
+    } catch (err) {
+      console.error("Avatar save failed:", err);
+    }
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById("agentSaveConfig").addEventListener("click", async function () {
+  const name = agentNameInput.value.trim();
+  const persona = agentPersonaInput.value.trim();
+  if (!name) { agentNameInput.focus(); return; }
+  try {
+    const body = await callApi("/api/agent/configure", { name, persona });
+    agentNameDisplay.textContent = body.agent.name;
+    agentPersonaDisplay.textContent = body.agent.persona;
+  } catch (err) {
+    agentNameDisplay.textContent = String(err);
+  }
+});
+
+document.getElementById("agentSendMessage").addEventListener("click", async function () {
+  const message = agentMessageInput.value.trim();
+  if (!message) { agentMessageInput.focus(); return; }
+  appendChatBubble("user", message);
+  agentMessageInput.value = "";
+  try {
+    const body = await callApi("/api/agent/communicate", { message });
+    appendChatBubble("agent", body.result.reply);
+  } catch (err) {
+    appendChatBubble("agent", "Error: " + String(err));
+  }
+});
+
+agentMessageInput.addEventListener("keydown", function (event) {
+  if (event.key === "Enter") document.getElementById("agentSendMessage").click();
+});
+
+document.getElementById("agentDecideBtn").addEventListener("click", async function () {
+  const question = agentDecideQuestion.value.trim();
+  const options = agentDecideOptions.value
+    .split("\\n")
+    .map(function (s) { return s.trim(); })
+    .filter(function (s) { return s.length > 0; });
+  if (!question) { agentDecideQuestion.focus(); return; }
+  if (options.length < 2) {
+    agentDecideResult.textContent = "Please enter at least two options (one per line).";
+    return;
+  }
+  try {
+    const body = await callApi("/api/agent/decide", { question, options });
+    agentDecideResult.textContent = pretty(body.result);
+  } catch (err) {
+    agentDecideResult.textContent = String(err);
+  }
+});
+
+document.getElementById("agentAdviseBtn").addEventListener("click", async function () {
+  const query = agentAdviseQuery.value.trim();
+  if (!query) { agentAdviseQuery.focus(); return; }
+  try {
+    const body = await callApi("/api/agent/advise", { query });
+    agentAdviseResult.textContent = pretty(body.result);
+  } catch (err) {
+    agentAdviseResult.textContent = String(err);
+  }
+});
+
 void (async () => {
   await refreshLedger();
   const health = await callApi("/api/health");
   omegaStatus.textContent = pretty(health);
+  try {
+    const agentStatus = await callApi("/api/agent/status");
+    agentNameDisplay.textContent = agentStatus.agent.name;
+    agentNameInput.value = agentStatus.agent.name;
+    agentPersonaDisplay.textContent = agentStatus.agent.persona;
+    agentPersonaInput.value = agentStatus.agent.persona;
+  } catch {
+    // non-fatal
+  }
 })();`;
