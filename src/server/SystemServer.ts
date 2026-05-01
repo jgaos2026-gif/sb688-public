@@ -127,6 +127,53 @@ async function routeRequest(
     return;
   }
 
+  if (method === "POST" && url === "/api/upload") {
+    const body = await readJsonBody(request);
+    const filename = typeof body.filename === "string" ? body.filename.trim() : "";
+    const content = typeof body.content === "string" ? body.content : "";
+    const contentType =
+      typeof body.contentType === "string" ? body.contentType : "application/octet-stream";
+
+    if (filename.length === 0) {
+      sendJson(response, 400, {
+        ok: false,
+        error: "Field 'filename' is required for /api/upload"
+      });
+      return;
+    }
+
+    const result = system.uploadManager.receive({ filename, content, contentType });
+    sendJson(response, result.accepted ? 200 : 422, { ok: result.accepted, result });
+    return;
+  }
+
+  if (method === "POST" && url === "/api/upload/dispatch") {
+    const body = await readJsonBody(request);
+    const filename = typeof body.filename === "string" ? body.filename.trim() : "";
+    const destination = typeof body.destination === "string" ? body.destination.trim() : "";
+
+    if (filename.length === 0 || destination.length === 0) {
+      sendJson(response, 400, {
+        ok: false,
+        error: "Fields 'filename' and 'destination' are required for /api/upload/dispatch"
+      });
+      return;
+    }
+
+    const result = system.uploadManager.dispatch({ filename, destination });
+    sendJson(response, result.dispatched ? 200 : 422, { ok: result.dispatched, result });
+    return;
+  }
+
+  if (method === "GET" && url === "/api/upload/log") {
+    sendJson(response, 200, {
+      ok: true,
+      logValid: system.uploadManager.verifyUploadLog(),
+      entries: system.uploadManager.uploadLog()
+    });
+    return;
+  }
+
   sendJson(response, 404, { ok: false, error: "Not found" });
 }
 

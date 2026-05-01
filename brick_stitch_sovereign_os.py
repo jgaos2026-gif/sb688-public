@@ -89,6 +89,28 @@ class Spine:
             "max_repair_rounds_per_test": 6,
         }
         self.integrity_compromised = False
+        # Tamper-evident upload event log (separate from main brick-state ledger).
+        self.upload_log: List[Dict] = []
+        self._upload_log_prev_hash: str = "GENESIS"
+
+    def append_upload_event(self, event: Dict) -> str:
+        """Append an upload event to the tamper-evident upload log."""
+        entry_hash = hash_blob(stable_json({"event": event, "prev": self._upload_log_prev_hash}))
+        signed = {**event, "prev_hash": self._upload_log_prev_hash, "hash": entry_hash}
+        self.upload_log.append(signed)
+        self._upload_log_prev_hash = entry_hash
+        return entry_hash
+
+    def verify_upload_log(self) -> bool:
+        """Verify the hash chain of the upload event log."""
+        prev = "GENESIS"
+        for entry in self.upload_log:
+            event = {k: v for k, v in entry.items() if k not in ("prev_hash", "hash")}
+            expected = hash_blob(stable_json({"event": event, "prev": prev}))
+            if entry["prev_hash"] != prev or entry["hash"] != expected:
+                return False
+            prev = entry["hash"]
+        return True
 
     def _build_snapshot(self, bricks_state: Dict[str, Dict]) -> Dict:
         return {"bricks": {k: deepcopy(v) for k, v in bricks_state.items()}}
@@ -158,6 +180,168 @@ class Spine:
         # Simulate a hostile modification to committed truth.
         self.ledger[self.current_version]["snapshot"]["bricks"]["core"]["status"] = "TAMPERED"
         self.integrity_compromised = True
+
+
+# ===================== SENTINEL =====================
+_SENTINEL_MAX_SIZE = 10 * 1024 * 1024  # 10 MB
+_SENTINEL_ALLOWED_TYPES = frozenset({
+    "text/plain",
+    "application/json",
+    "application/pdf",
+    "application/octet-stream",
+    "text/csv",
+})
+
+
+class SentinelLayer:
+    """Scans incoming uploads for anomalies before they are accepted into the brick FS."""
+
+    def __init__(self, spine: "Spine", clock: DeterministicClock):
+        self.spine = spine
+        self.clock = clock
+        self._seen_hashes: set = set()
+
+    def scan(self, filename: str, content: bytes, content_type: str) -> Tuple[bool, List[str]]:
+        """Return (clean, anomalies). Records anomalies to the spine upload log."""
+        anomalies: List[str] = []
+
+        if len(content) == 0:
+            anomalies.append("empty_content")
+
+        if len(content) > _SENTINEL_MAX_SIZE:
+            anomalies.append(f"content_too_large:{len(content)}")
+
+        if ".." in filename or "/" in filename or "\\" in filename:
+            anomalies.append("suspicious_filename")
+
+        normalized_type = content_type.split(";")[0].strip().lower()
+        if normalized_type not in _SENTINEL_ALLOWED_TYPES:
+            anomalies.append(f"unsupported_content_type:{normalized_type}")
+
+        content_hash = hash_blob(content)
+        if content_hash in self._seen_hashes:
+            anomalies.append("duplicate_content_hash")
+
+        if not anomalies:
+            self._seen_hashes.add(content_hash)
+
+        return len(anomalies) == 0, anomalies
+
+
+# ===================== FILE UPLOAD MANAGER =====================
+class FileUploadManager:
+    """Handles incoming file uploads and autonomous self-dispatch.
+
+    All events are recorded in the Spine's tamper-evident upload log.
+    """
+
+    def __init__(self, spine: "Spine", bricks: Dict[str, Brick], sentinel: SentinelLayer, clock: DeterministicClock):
+        self.spine = spine
+        self.bricks = bricks
+        self.sentinel = sentinel
+        self.clock = clock
+        self._store: Dict[str, Dict] = {}
+
+    def receive(self, filename: str, content: bytes, content_type: str = "application/octet-stream") -> Tuple[bool, Dict]:
+        """Receive an incoming file upload, validate through the sentinel, and store."""
+        ts = self.clock.now()
+        clean, anomalies = self.sentinel.scan(filename, content, content_type)
+        content_hash = hash_blob(content)
+
+        event: Dict = {
+            "action": "receive_upload",
+            "filename": filename,
+            "content_type": content_type,
+            "size": len(content),
+            "content_hash": content_hash,
+            "sentinel_pass": clean,
+            "anomalies": anomalies,
+            "timestamp": ts,
+        }
+
+        if not clean:
+            event["status"] = "rejected"
+            self.spine.append_upload_event(event)
+            return False, {"status": "rejected", "anomalies": anomalies, "filename": filename}
+
+        fs_brick = self.bricks.get("fs")
+        if fs_brick is None or not fs_brick.healthy:
+            event["status"] = "failed_fs_unavailable"
+            self.spine.append_upload_event(event)
+            return False, {"status": "failed", "reason": "fs_brick_unavailable"}
+
+        fs_brick.state.setdefault("files", {})[filename] = {
+            "hash": content_hash,
+            "size": len(content),
+            "content_type": content_type,
+            "stored_at": ts,
+        }
+        self._store[filename] = {
+            "content": content,
+            "content_hash": content_hash,
+            "content_type": content_type,
+            "size": len(content),
+            "stored_at": ts,
+        }
+
+        event["status"] = "accepted"
+        self.spine.append_upload_event(event)
+        return True, {"status": "accepted", "filename": filename, "hash": content_hash, "size": len(content)}
+
+    def dispatch(self, filename: str, destination: str) -> Tuple[bool, Dict]:
+        """Self-upload a stored file to a designated logical destination."""
+        ts = self.clock.now()
+
+        if filename not in self._store:
+            self.spine.append_upload_event({
+                "action": "dispatch_upload",
+                "filename": filename,
+                "destination": destination,
+                "status": "failed",
+                "reason": "file_not_found",
+                "timestamp": ts,
+            })
+            return False, {"status": "failed", "reason": "file_not_found", "filename": filename}
+
+        if ".." in destination or destination.startswith("/") or destination.startswith("\\"):
+            self.spine.append_upload_event({
+                "action": "dispatch_upload",
+                "filename": filename,
+                "destination": destination,
+                "status": "rejected",
+                "reason": "invalid_destination",
+                "timestamp": ts,
+            })
+            return False, {"status": "rejected", "reason": "invalid_destination"}
+
+        record = self._store[filename]
+        actual_hash = hash_blob(record["content"])
+        if actual_hash != record["content_hash"]:
+            self.spine.append_upload_event({
+                "action": "dispatch_upload",
+                "filename": filename,
+                "destination": destination,
+                "status": "failed",
+                "reason": "integrity_check_failed",
+                "timestamp": ts,
+            })
+            return False, {"status": "failed", "reason": "integrity_check_failed"}
+
+        self.spine.append_upload_event({
+            "action": "dispatch_upload",
+            "filename": filename,
+            "destination": destination,
+            "content_hash": record["content_hash"],
+            "size": record["size"],
+            "status": "dispatched",
+            "timestamp": ts,
+        })
+        return True, {
+            "status": "dispatched",
+            "filename": filename,
+            "destination": destination,
+            "hash": record["content_hash"],
+        }
 
 
 # ===================== HEALING =====================
@@ -287,6 +471,8 @@ class SovereignOS:
         self.spine = Spine(self.clock)
         self.healing: Optional[HealingLayer] = None
         self.operations: Optional[OperationsLayer] = None
+        self.sentinel: Optional[SentinelLayer] = None
+        self.upload_manager: Optional[FileUploadManager] = None
         self.setup_system()
 
     def setup_system(self) -> None:
@@ -296,6 +482,7 @@ class SovereignOS:
             "driver_net": Brick("driver_net", ["core"], {"status": "up", "packets": 0, "driver": "mesh-v1"}),
             "fs": Brick("fs", ["core", "driver_net"], {"status": "mounted", "files": {}, "journal_clean": True}),
             "user_app": Brick("user_app", ["fs"], {"status": "active", "data": "hello", "checkpoint": 0}),
+            "upload": Brick("upload", ["fs"], {"status": "ready", "pending_uploads": 0, "dispatched": 0}),
         }
         for name, brick in self.bricks.items():
             self.dep_graph.add_node(name)
@@ -304,6 +491,8 @@ class SovereignOS:
 
         self.healing = HealingLayer(self.spine, self.bricks, self.dep_graph, self.clock)
         self.operations = OperationsLayer(self.spine, self.bricks, self.dep_graph, self.clock)
+        self.sentinel = SentinelLayer(self.spine, self.clock)
+        self.upload_manager = FileUploadManager(self.spine, self.bricks, self.sentinel, self.clock)
 
     # ---------------- Fault Injection ----------------
     def inject_fault(self, brick_name: Optional[str], fault_type: str) -> bool:
