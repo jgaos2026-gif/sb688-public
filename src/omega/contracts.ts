@@ -105,6 +105,63 @@ export interface OmegaTargets {
   readonly failureTolerance: "zero";
 }
 
+// ── Sentinel self-awareness contracts ────────────────────────────────────────
+
+/**
+ * A single health observation recorded by the sentinel per supervisor tick.
+ * The `prevHash` field links each record to its predecessor for tamper evidence.
+ */
+export interface SentinelHealthMetric {
+  readonly tick: number;
+  readonly at: string;
+  readonly drift: number;
+  readonly breach: boolean;
+  readonly pulseAlive: boolean;
+  /** Hash of the preceding metric (or "SENTINEL_GENESIS" for the first). */
+  readonly prevHash: string;
+}
+
+/**
+ * Graduated adaptive recommendation produced by the sentinel after
+ * analysing its sliding observation window.
+ *
+ *   NOMINAL     — health nominal, no action required
+ *   MONITOR     — elevated breach rate; increase observation cadence
+ *   ESCALATE    — persistent faults; deeper healing protocols required
+ *   QUARANTINE  — majority-breach window; isolate and restore from clean seed
+ *   FAILSAFE    — saturation breach; activate fail-safe mode immediately
+ */
+export type SentinelRecommendation =
+  | "NOMINAL"
+  | "MONITOR"
+  | "ESCALATE"
+  | "QUARANTINE"
+  | "FAILSAFE";
+
+/** Diagnosis produced by the sentinel over its current sliding window. */
+export interface SentinelDiagnosis {
+  readonly windowSize: number;
+  readonly breachCount: number;
+  /** Ratio of breached ticks in the window, in [0, 1]. */
+  readonly breachRate: number;
+  readonly consecutiveBreaches: number;
+  readonly recommendation: SentinelRecommendation;
+  readonly reason: string;
+  /** True when the internal metric hash-chain has not been tampered with. */
+  readonly selfIntegrityOk: boolean;
+}
+
+/** Full sentinel status snapshot exposed through OmegaStatus. */
+export interface SentinelStatus {
+  readonly active: boolean;
+  readonly metricsRecorded: number;
+  readonly lastDiagnosis: SentinelDiagnosis;
+  /** FNV-1a hash of the entire metric chain for external tamper verification. */
+  readonly integrityHash: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface OmegaStatus {
   readonly status: "SB689_READY" | "SB689_RESURRECTING" | "SB689_BREACH";
   readonly cycle: number;
@@ -113,4 +170,5 @@ export interface OmegaStatus {
   readonly lastResurrection?: ResurrectionEvent;
   readonly stitch: StitchManifest;
   readonly targets: OmegaTargets;
+  readonly sentinel: SentinelStatus;
 }
