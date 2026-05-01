@@ -278,7 +278,119 @@ class OperationsLayer:
         return False
 
 
-# ===================== SOVEREIGN OS =====================
+# ===================== SENTINEL MONITOR =====================
+class SentinelMonitor:
+    """
+    Autonomous self-awareness watchdog for the Brick Stitch Sovereign OS.
+
+    Tracks fault/repair events across bricks, builds a tamper-evident
+    hash chain of observations, detects repeat offenders, and emits
+    adaptive healing strategy recommendations that escalate as a brick
+    accumulates unresolved faults.
+
+    Strategies (ascending severity):
+        standard       — use the normal HealingLayer path
+        deep_restart   — standard healing + force-restart of all downstream
+        force_rollback — bypass HealingLayer; restore directly from spine snapshot
+    """
+
+    ESCALATION_THRESHOLD: int = 3   # faults in window before force_rollback
+    WINDOW_SIZE: int = 10           # sliding observation window
+
+    def __init__(self, clock: DeterministicClock) -> None:
+        self.clock = clock
+        self._records: List[Dict] = []
+        self._chain_hash: str = "SENTINEL_GENESIS"
+
+    # ---- public API ----
+
+    def observe(
+        self,
+        brick_name: str,
+        fault_type: str,
+        healed: bool,
+        strategy: str = "standard",
+    ) -> None:
+        """Record a fault/repair event and advance the tamper-evident chain."""
+        record: Dict = {
+            "brick": brick_name,
+            "fault": fault_type,
+            "healed": healed,
+            "strategy": strategy,
+            "t": self.clock.now(),
+            "prev_hash": self._chain_hash,
+        }
+        self._chain_hash = hash_blob(stable_json(record))
+        self._records.append(record)
+
+    def suggest_strategy(self, brick_name: str, fault_type: str) -> str:  # noqa: ARG002
+        """
+        Return an adaptive healing strategy for *brick_name* based on its
+        observed fault history within the current sliding window.
+        """
+        brick_records = self._window(brick_name)
+        fault_count = len(brick_records)
+        unhealed_count = sum(1 for r in brick_records if not r["healed"])
+
+        if unhealed_count >= 2 or fault_count >= self.ESCALATION_THRESHOLD:
+            return "force_rollback"
+        if fault_count >= 2:
+            return "deep_restart"
+        return "standard"
+
+    def diagnose(self) -> Dict:
+        """
+        Analyse the current observation window and return an anomaly report
+        that includes per-brick fault counts, repeat offenders, and the
+        result of the self-integrity chain verification.
+        """
+        window = self._window()
+        by_brick: Dict[str, Dict] = {}
+        for record in window:
+            entry = by_brick.setdefault(
+                record["brick"],
+                {"faults": 0, "unhealed": 0, "strategies": []},
+            )
+            entry["faults"] += 1
+            if not record["healed"]:
+                entry["unhealed"] += 1
+            entry["strategies"].append(record["strategy"])
+
+        repeat_offenders = [
+            brick
+            for brick, data in by_brick.items()
+            if data["faults"] >= self.ESCALATION_THRESHOLD
+        ]
+        return {
+            "by_brick": by_brick,
+            "repeat_offenders": repeat_offenders,
+            "chain_integrity": self.self_check(),
+            "total_observations": len(window),
+            "window_size": self.WINDOW_SIZE,
+        }
+
+    def self_check(self) -> bool:
+        """Replay the hash chain; return True when the record log is intact."""
+        return self._verify_chain()
+
+    # ---- private ----
+
+    def _window(self, brick_name: Optional[str] = None) -> List[Dict]:
+        window = self._records[-self.WINDOW_SIZE:]
+        if brick_name is not None:
+            return [r for r in window if r["brick"] == brick_name]
+        return window
+
+    def _verify_chain(self) -> bool:
+        current_hash = "SENTINEL_GENESIS"
+        for record in self._records:
+            if record.get("prev_hash") != current_hash:
+                return False
+            current_hash = hash_blob(stable_json(record))
+        return current_hash == self._chain_hash
+
+
+
 class SovereignOS:
     def __init__(self):
         self.clock = DeterministicClock()
@@ -287,6 +399,9 @@ class SovereignOS:
         self.spine = Spine(self.clock)
         self.healing: Optional[HealingLayer] = None
         self.operations: Optional[OperationsLayer] = None
+        # Sentinel persists across setup_system() calls so it accumulates
+        # knowledge across the full test suite run.
+        self.sentinel = SentinelMonitor(self.clock)
         self.setup_system()
 
     def setup_system(self) -> None:
@@ -343,9 +458,9 @@ class SovereignOS:
 
         if fault_type == "spine_tamper":
             recovered = self.healing.recover_spine()
-            if recovered:
-                return self.operations.run_cycle()
-            return False
+            ok = self.operations.run_cycle() if recovered else False
+            self.sentinel.observe("spine", "spine_tamper", ok, "system")
+            return ok
 
         if fault_type == "heal_layer_fault":
             # self-heal the healing plane, because apparently even rescue crews need rescue crews.
@@ -354,13 +469,35 @@ class SovereignOS:
                 self.bricks[brick_name].healthy = True
                 self.bricks[brick_name].state.pop("corrupted", None)
                 self.bricks[brick_name].state.pop("crash_flag", None)
-            return self.operations.run_cycle()
+            ok = self.operations.run_cycle()
+            self.sentinel.observe(brick_name or "system", "heal_layer_fault", ok, "system")
+            return ok
 
         if brick_name is None:
             return False
 
+        # Consult sentinel for an adaptive healing strategy based on history.
+        strategy = self.sentinel.suggest_strategy(brick_name, fault_type)
+
+        if strategy == "force_rollback":
+            last_good = self.spine.get_last_good(brick_name)
+            if last_good:
+                self.bricks[brick_name].set_state(last_good)
+                self.bricks[brick_name].state.pop("corrupted", None)
+                self.bricks[brick_name].state.pop("crash_flag", None)
+                if self.bricks[brick_name].state.get("status") == "updating":
+                    self.bricks[brick_name].state["status"] = (
+                        "mounted" if brick_name == "fs" else "running"
+                    )
+                downstream_ok = self.healing.rerun_downstream(brick_name)
+                ok = self.operations.run_cycle() if downstream_ok else False
+                self.sentinel.observe(brick_name, fault_type, ok, strategy)
+                return ok
+            # Fall through to standard path if no snapshot is available.
+
         healed = self.healing.heal(brick_name, fault_type)
         if not healed:
+            self.sentinel.observe(brick_name, fault_type, False, strategy)
             return False
 
         self.bricks[brick_name].state.pop("corrupted", None)
@@ -370,9 +507,17 @@ class SovereignOS:
         if self.bricks[brick_name].state.get("status") == "updating":
             self.bricks[brick_name].state["status"] = "mounted" if brick_name == "fs" else "running"
 
+        if strategy == "deep_restart":
+            # Force-restart all downstream bricks before re-running them.
+            for name in nx.descendants(self.dep_graph, brick_name):
+                self.bricks[name].healthy = True
+                self.bricks[name].state.pop("crash_flag", None)
+
         downstream_ok = self.healing.rerun_downstream(brick_name)
         cycle_ok = self.operations.run_cycle()
-        return healed and downstream_ok and cycle_ok
+        ok = healed and downstream_ok and cycle_ok
+        self.sentinel.observe(brick_name, fault_type, ok, strategy)
+        return ok
 
     # ---------------- Validation ----------------
     def validate_system(self) -> Tuple[bool, Dict[str, bool]]:
@@ -382,6 +527,7 @@ class SovereignOS:
         no_corruption = not any(brick.state.get("corrupted") for brick in self.bricks.values())
         no_mid_update = not any(brick.state.get("status") == "updating" for brick in self.bricks.values())
         dag_ok = nx.is_directed_acyclic_graph(self.dep_graph)
+        sentinel_ok = self.sentinel.self_check()
         details = {
             "health": health,
             "chain_ok": chain_ok,
@@ -389,6 +535,7 @@ class SovereignOS:
             "no_corruption": no_corruption,
             "no_mid_update": no_mid_update,
             "dag_ok": dag_ok,
+            "sentinel_ok": sentinel_ok,
         }
         return all(details.values()), details
 
@@ -446,6 +593,7 @@ class SovereignOS:
             ("5. Cascading Dependency Failure", "core", "dependency_failure"),
             ("6. Persistent Storage Corruption", "fs", "storage_corrupt"),
             ("7. Update Failure Mid-Install", "fs", "partial_update"),
+            ("8. Sentinel Self-Awareness Validation", None, None),
         ]
 
         all_passed = True
@@ -457,6 +605,15 @@ class SovereignOS:
                 if not passed:
                     print(f"  details={report['details']}")
             all_passed = all_passed and passed
+
+        if verbose:
+            diagnosis = self.sentinel.diagnose()
+            repeat = diagnosis["repeat_offenders"] or "none"
+            print(
+                f"\n[SENTINEL] observations={diagnosis['total_observations']} | "
+                f"repeat_offenders={repeat} | "
+                f"chain_intact={diagnosis['chain_integrity']}"
+            )
         return all_passed
 
     def run_three_clean_passes(self) -> bool:
