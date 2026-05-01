@@ -18,6 +18,10 @@ import networkx as nx
 # - no commits of unhealthy/corrupt state
 # - test harness that repairs and retries until stable
 # - every scenario must pass 3 times in a row
+# Sentinel additions (SB689 OMEGA integration):
+# - BraidedLogic: personality · moral · judgment layer
+# - SentinelLayer: proactive self-monitoring, anomaly detection,
+#   adaptive decision-making, incident learning, autonomous evolution
 # ============================================================
 
 
@@ -234,6 +238,280 @@ class HealingLayer:
         return ok
 
 
+# ===================== BRAIDED LOGIC =====================
+class BraidedLogic:
+    """
+    Braided Logic — personality · moral · judgment layer.
+
+    Every sentinel action is routed through all three braids before
+    execution to ensure ethical, contextual, and personality-consistent
+    decision-making.  No unilateral destructive action may bypass the
+    moral braid.
+
+    Personalities
+    ─────────────
+    steadfast  : always execute the originally proposed action
+    adaptive   : scale aggressiveness to the observed threat level
+    cautious   : prefer monitoring over intervention for non-critical threats
+    """
+
+    PERSONALITIES = ("steadfast", "adaptive", "cautious")
+
+    def __init__(self, personality: str = "adaptive"):
+        if personality not in self.PERSONALITIES:
+            raise ValueError(f"Unknown personality: {personality!r}")
+        self.personality = personality
+        self._decision_log: List[Dict] = []
+
+    # ---- moral braid ----
+
+    def moral_check(self, action: str, context: Dict) -> bool:
+        """Return True only when the proposed action passes ethical guardrails."""
+        # Never purge state without a confirmed backup in the ledger.
+        if action == "purge" and not context.get("has_backup"):
+            return False
+        # Never disable the audit trail — tamper-evident logging is non-negotiable.
+        if action == "disable_ledger":
+            return False
+        # Never exceed the heal budget without external authorisation.
+        if action == "force_heal" and context.get("heal_count", 0) >= 5:
+            return False
+        return True
+
+    # ---- judgment braid ----
+
+    def judgment(self, action: str, threat_level: str, context: Dict) -> Dict:
+        """
+        Apply personality + moral reasoning to produce a judgment packet:
+        {approved, rationale, adjusted_action}.
+        """
+        moral_ok = self.moral_check(action, context)
+
+        if not moral_ok:
+            result = {
+                "approved": False,
+                "rationale": f"Moral braid rejected action={action!r} (context constraint).",
+                "adjusted_action": "alert_only",
+            }
+            self._decision_log.append(result)
+            return result
+
+        # Personality modulates aggressiveness.
+        if self.personality == "cautious" and threat_level in {"low", "moderate"}:
+            result = {
+                "approved": True,
+                "rationale": f"Cautious personality: observe and log for threat={threat_level!r}.",
+                "adjusted_action": "monitor",
+            }
+        elif self.personality == "steadfast":
+            result = {
+                "approved": True,
+                "rationale": f"Steadfast personality: execute action={action!r} unconditionally.",
+                "adjusted_action": action,
+            }
+        else:
+            # adaptive: scale action to threat level
+            adjusted = action if threat_level in {"high", "critical"} else "monitor"
+            result = {
+                "approved": True,
+                "rationale": f"Adaptive judgment for threat={threat_level!r}: {adjusted}.",
+                "adjusted_action": adjusted,
+            }
+
+        self._decision_log.append(result)
+        return result
+
+    def decision_log(self) -> List[Dict]:
+        return list(self._decision_log)
+
+
+# ===================== SENTINEL =====================
+class SentinelLayer:
+    """
+    Sentinel Layer — self-aware vigilance plane for the Sovereign OS.
+
+    Sits above the HealingLayer and provides:
+    - Proactive health trend monitoring per brick
+    - Anomaly detection (repeated failures, stalled updates, chain breaks)
+    - Threat-level classification: low / moderate / high / critical
+    - Adaptive decision-making via BraidedLogic
+    - Incident learning — tightens alert threshold as incident rate escalates
+    - Autonomous threshold evolution within safe bounds
+    - Alert history and anomaly log for post-incident forensics
+    """
+
+    THREAT_LOW = "low"
+    THREAT_MODERATE = "moderate"
+    THREAT_HIGH = "high"
+    THREAT_CRITICAL = "critical"
+    # Multiplier applied to alert_threshold to detect surge / tighten threshold.
+    THRESHOLD_EVOLUTION_MULTIPLIER = 2
+
+    def __init__(
+        self,
+        healing: "HealingLayer",
+        spine: "Spine",
+        clock: DeterministicClock,
+        braided_logic: Optional[BraidedLogic] = None,
+        initial_alert_threshold: int = 3,
+    ):
+        self.healing = healing
+        self.spine = spine
+        self.clock = clock
+        self.braided_logic = braided_logic or BraidedLogic()
+
+        # Per-brick incident counters for learning.
+        self._incident_counts: Dict[str, int] = {}
+        self._anomaly_log: List[Dict] = []
+        self._alerts: List[Dict] = []
+
+        # Adaptive threshold — tightens autonomously when incidents escalate.
+        self._alert_threshold = initial_alert_threshold
+
+    # ---- proactive health watch ----
+
+    def watch(self, bricks: Dict[str, "Brick"]) -> Dict:
+        """
+        Inspect current brick health and emit a sentinel status report.
+        Returns a dict with threat_level, anomalies, chain_integrity, and
+        the recommended action after passing through BraidedLogic.
+        """
+        unhealthy = [name for name, b in bricks.items() if not b.healthy]
+        high_heal = [
+            name for name, b in bricks.items()
+            if b.heal_count >= self._alert_threshold
+        ]
+        corrupted = [name for name, b in bricks.items() if b.state.get("corrupted")]
+
+        threat_level = self._classify_threat(unhealthy, high_heal, corrupted)
+        anomalies = self._detect_anomalies(bricks)
+
+        # Route the proposed action through BraidedLogic before committing.
+        proposed = "intervene" if threat_level in {self.THREAT_HIGH, self.THREAT_CRITICAL} else "monitor"
+        context = {
+            "unhealthy": unhealthy,
+            "high_heal": high_heal,
+            "corrupted": corrupted,
+            "heal_count": max((b.heal_count for b in bricks.values()), default=0),
+        }
+        judgment = self.braided_logic.judgment(proposed, threat_level, context)
+
+        status = {
+            "timestamp": self.clock.now(),
+            "threat_level": threat_level,
+            "unhealthy_bricks": unhealthy,
+            "high_heal_bricks": high_heal,
+            "corrupted_bricks": corrupted,
+            "anomalies": anomalies,
+            "chain_integrity": self.spine.verify_chain(),
+            "judgment": judgment,
+        }
+
+        if threat_level in {self.THREAT_HIGH, self.THREAT_CRITICAL}:
+            self._raise_alert(threat_level, status)
+
+        return status
+
+    # ---- anomaly detection ----
+
+    def _detect_anomalies(self, bricks: Dict[str, "Brick"]) -> List[str]:
+        anomalies: List[str] = []
+
+        if not self.spine.verify_chain():
+            anomalies.append("spine_chain_broken")
+
+        for name, brick in bricks.items():
+            if brick.heal_count >= self._alert_threshold:
+                anomalies.append(f"repeated_heals:{name}:{brick.heal_count}")
+            if brick.state.get("corrupted"):
+                anomalies.append(f"active_corruption:{name}")
+            if brick.update_in_progress:
+                anomalies.append(f"stalled_update:{name}")
+
+        # Detect rapid incident escalation from learned history.
+        for name, count in self._incident_counts.items():
+            if count > self._alert_threshold * self.THRESHOLD_EVOLUTION_MULTIPLIER:
+                anomalies.append(f"escalating_incidents:{name}:{count}")
+
+        return anomalies
+
+    # ---- threat classification ----
+
+    def _classify_threat(
+        self,
+        unhealthy: List[str],
+        high_heal: List[str],
+        corrupted: List[str],
+    ) -> str:
+        if not self.spine.verify_chain() or len(corrupted) > 1:
+            return self.THREAT_CRITICAL
+        if corrupted or len(unhealthy) > 1:
+            return self.THREAT_HIGH
+        if high_heal or unhealthy:
+            return self.THREAT_MODERATE
+        return self.THREAT_LOW
+
+    # ---- adaptive decision-making (public entry point) ----
+
+    def decide(self, proposed_action: str, threat_level: str, context: Dict) -> Dict:
+        """
+        Route a proposed sentinel action through BraidedLogic before execution.
+        Returns the final judgment packet.
+        """
+        return self.braided_logic.judgment(proposed_action, threat_level, context)
+
+    # ---- incident learning ----
+
+    def record_incident(self, brick_name: str, fault_type: str) -> None:
+        """
+        Register a fault event so the sentinel can learn patterns over time
+        and autonomously tighten alert thresholds.
+        """
+        self._incident_counts[brick_name] = self._incident_counts.get(brick_name, 0) + 1
+        self._anomaly_log.append({
+            "brick": brick_name,
+            "fault": fault_type,
+            "at": self.clock.now(),
+            "cumulative": self._incident_counts[brick_name],
+        })
+        self._evolve_thresholds(brick_name)
+
+    # ---- autonomous evolution ----
+
+    def _evolve_thresholds(self, brick_name: str) -> None:
+        """
+        Tighten the alert threshold when any brick's incident count reaches
+        2× the current threshold — catching future surges sooner.
+        """
+        count = self._incident_counts.get(brick_name, 0)
+        if count >= self._alert_threshold * self.THRESHOLD_EVOLUTION_MULTIPLIER and self._alert_threshold > 1:
+            self._alert_threshold = max(1, self._alert_threshold - 1)
+
+    # ---- alerts ----
+
+    def _raise_alert(self, threat_level: str, context: Dict) -> None:
+        alert = {
+            "at": self.clock.now(),
+            "threat_level": threat_level,
+            "summary": f"Sentinel alert: {threat_level.upper()} threat detected.",
+            "context": {k: v for k, v in context.items() if k != "context"},
+        }
+        self._alerts.append(alert)
+
+    def alerts(self) -> List[Dict]:
+        return list(self._alerts)
+
+    def anomaly_log(self) -> List[Dict]:
+        return list(self._anomaly_log)
+
+    def incident_counts(self) -> Dict[str, int]:
+        return dict(self._incident_counts)
+
+    @property
+    def alert_threshold(self) -> int:
+        return self._alert_threshold
+
+
 # ===================== OPERATIONS =====================
 class OperationsLayer:
     def __init__(self, spine: Spine, bricks: Dict[str, Brick], dep_graph: nx.DiGraph, clock: DeterministicClock):
@@ -287,6 +565,7 @@ class SovereignOS:
         self.spine = Spine(self.clock)
         self.healing: Optional[HealingLayer] = None
         self.operations: Optional[OperationsLayer] = None
+        self.sentinel: Optional[SentinelLayer] = None
         self.setup_system()
 
     def setup_system(self) -> None:
@@ -304,15 +583,18 @@ class SovereignOS:
 
         self.healing = HealingLayer(self.spine, self.bricks, self.dep_graph, self.clock)
         self.operations = OperationsLayer(self.spine, self.bricks, self.dep_graph, self.clock)
+        self.sentinel = SentinelLayer(self.healing, self.spine, self.clock)
 
     # ---------------- Fault Injection ----------------
     def inject_fault(self, brick_name: Optional[str], fault_type: str) -> bool:
         if fault_type == "spine_tamper":
             self.spine.tamper_with_head()
+            self.sentinel.record_incident("spine", fault_type)
             return True
 
         if fault_type == "heal_layer_fault":
             self.healing.online = False
+            self.sentinel.record_incident("heal_layer", fault_type)
             return True
 
         if brick_name is None or brick_name not in self.bricks:
@@ -334,6 +616,8 @@ class SovereignOS:
             brick.healthy = False
         else:
             return False
+
+        self.sentinel.record_incident(brick_name, fault_type)
         return True
 
     # ---------------- Repair Logic ----------------
@@ -457,7 +741,110 @@ class SovereignOS:
                 if not passed:
                     print(f"  details={report['details']}")
             all_passed = all_passed and passed
-        return all_passed
+
+        sentinel_passed = self.run_sentinel_tests_once(verbose=verbose)
+        return all_passed and sentinel_passed
+
+    # ---------------- Sentinel Tests ----------------
+
+    def run_sentinel_tests_once(self, verbose: bool = True) -> bool:
+        """
+        Run the sentinel self-awareness test suite once.
+        Each test is independent; the system is re-initialised between runs.
+        """
+        results = [
+            self._sentinel_test_nominal(verbose),
+            self._sentinel_test_anomaly_detection(verbose),
+            self._sentinel_test_incident_learning(verbose),
+            self._sentinel_test_moral_guardrail(verbose),
+            self._sentinel_test_chain_integrity(verbose),
+        ]
+        return all(results)
+
+    def _sentinel_test_nominal(self, verbose: bool) -> bool:
+        """8. Sentinel watch on a healthy system → threat_level = low."""
+        os = SovereignOS()
+        os.operations.boot()
+        report = os.sentinel.watch(os.bricks)
+        passed = (
+            report["threat_level"] == SentinelLayer.THREAT_LOW
+            and report["chain_integrity"] is True
+            and len(report["anomalies"]) == 0
+        )
+        if verbose:
+            status = "PASS" if passed else "FAIL"
+            print(f"8. Sentinel Nominal Watch: {status} | threat={report['threat_level']}")
+        return passed
+
+    def _sentinel_test_anomaly_detection(self, verbose: bool) -> bool:
+        """9. Sentinel detects corruption anomaly after fault injection."""
+        os = SovereignOS()
+        os.operations.boot()
+        os.inject_fault("fs", "storage_corrupt")
+        report = os.sentinel.watch(os.bricks)
+        anomalies = report["anomalies"]
+        has_corruption = any("active_corruption:fs" in a for a in anomalies)
+        passed = (
+            report["threat_level"] in {SentinelLayer.THREAT_HIGH, SentinelLayer.THREAT_CRITICAL}
+            and has_corruption
+        )
+        if verbose:
+            status = "PASS" if passed else "FAIL"
+            print(
+                f"9. Sentinel Anomaly Detection: {status} | "
+                f"threat={report['threat_level']} | anomalies={len(anomalies)}"
+            )
+        return passed
+
+    def _sentinel_test_incident_learning(self, verbose: bool) -> bool:
+        """10. Sentinel tightens alert threshold after repeated incidents."""
+        os = SovereignOS()
+        os.operations.boot()
+        initial_threshold = os.sentinel.alert_threshold
+        # Record 2× threshold incidents on the same brick to trigger evolution.
+        for _ in range(initial_threshold * SentinelLayer.THRESHOLD_EVOLUTION_MULTIPLIER):
+            os.sentinel.record_incident("core", "dependency_failure")
+        evolved = os.sentinel.alert_threshold < initial_threshold
+        passed = evolved
+        if verbose:
+            status = "PASS" if passed else "FAIL"
+            print(
+                f"10. Sentinel Incident Learning: {status} | "
+                f"threshold {initial_threshold}→{os.sentinel.alert_threshold}"
+            )
+        return passed
+
+    def _sentinel_test_moral_guardrail(self, verbose: bool) -> bool:
+        """11. BraidedLogic rejects a purge action when no backup exists."""
+        logic = BraidedLogic(personality="adaptive")
+        judgment = logic.judgment("purge", "high", {"has_backup": False})
+        passed = (
+            judgment["approved"] is False
+            and judgment["adjusted_action"] == "alert_only"
+        )
+        if verbose:
+            status = "PASS" if passed else "FAIL"
+            print(
+                f"11. Sentinel Moral Guardrail: {status} | "
+                f"approved={judgment['approved']} action={judgment['adjusted_action']}"
+            )
+        return passed
+
+    def _sentinel_test_chain_integrity(self, verbose: bool) -> bool:
+        """12. Sentinel reports spine_chain_broken anomaly after spine tamper."""
+        os = SovereignOS()
+        os.operations.boot()
+        os.inject_fault(None, "spine_tamper")
+        report = os.sentinel.watch(os.bricks)
+        has_chain_anomaly = any("spine_chain_broken" in a for a in report["anomalies"])
+        passed = has_chain_anomaly and report["threat_level"] == SentinelLayer.THREAT_CRITICAL
+        if verbose:
+            status = "PASS" if passed else "FAIL"
+            print(
+                f"12. Sentinel Chain Integrity: {status} | "
+                f"threat={report['threat_level']} | chain_ok={report['chain_integrity']}"
+            )
+        return passed
 
     def run_three_clean_passes(self) -> bool:
         streak = 0
