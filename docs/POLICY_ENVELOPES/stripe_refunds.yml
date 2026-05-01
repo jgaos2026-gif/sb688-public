@@ -20,5 +20,5 @@ required_logging:
     - stripe_charge_id
     - stripe_payment_intent_id
     - charge_created_at
-    - decision_timestamp
-    - decision_reason
+    - decision_at
+    - reason

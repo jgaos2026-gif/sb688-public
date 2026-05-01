@@ -1,4 +1,5 @@
 {
+  "_schema": "FINANCE_LEDGER_EXTERNAL — not the SB689 AuditLedger/AuditTransition schema",
   "action_type": "RECONCILE_STRIPE_PAYOUT_TO_BLUEVINE_DEPOSIT",
   "evidence_label": "VERIFIED",
   "policy_id": "FINANCE_STRIPE_DAILY_RECONCILIATION",
