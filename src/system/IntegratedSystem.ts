@@ -4,11 +4,14 @@ import { AuditLedger } from "../ledger/AuditLedger";
 import { OmegaSupervisor } from "../omega/OmegaSupervisor";
 import type { OmegaStatus } from "../omega/contracts";
 import { BraidedRuntime } from "../runtime/BraidedRuntime";
+import { SentinelLayer } from "../sentinel/SentinelLayer";
+import type { SentinelFullReport, SentinelWatchReport } from "../sentinel/contracts";
 
 export interface IntegratedSystemDeps {
   readonly ledger?: AuditLedger;
   readonly runtime?: BraidedRuntime;
   readonly omega?: OmegaSupervisor;
+  readonly sentinel?: SentinelLayer;
   readonly seedState?: Readonly<Record<string, unknown>>;
 }
 
@@ -20,6 +23,7 @@ export interface SystemMonitorInput {
 export interface SystemProcessResult {
   readonly runtime: RuntimeResponse;
   readonly omega: OmegaStatus;
+  readonly sentinel: SentinelWatchReport;
 }
 
 const DEFAULT_SEED: Readonly<Record<string, unknown>> = Object.freeze({
@@ -29,10 +33,13 @@ const DEFAULT_SEED: Readonly<Record<string, unknown>> = Object.freeze({
   bricks: ["SEED", "GHOST", "ARMOR", "CROWN"]
 });
 
+const RUNTIME_COMPONENT = "braided-runtime" as const;
+
 export class IntegratedSystem {
   private readonly ledger: AuditLedger;
   private readonly runtime: BraidedRuntime;
   private readonly omega: OmegaSupervisor;
+  private readonly sentinel: SentinelLayer;
   private readonly seedState: Readonly<Record<string, unknown>>;
 
   constructor(deps: IntegratedSystemDeps = {}) {
@@ -43,6 +50,7 @@ export class IntegratedSystem {
       ledger: this.ledger,
       seedState: this.seedState
     });
+    this.sentinel = deps.sentinel ?? new SentinelLayer({ ledger: this.ledger });
   }
 
   async process(intent: UserIntent, monitor: SystemMonitorInput = {}): Promise<SystemProcessResult> {
@@ -51,8 +59,14 @@ export class IntegratedSystem {
       liveState: monitor.liveState ?? this.seedState,
       pulseAlive: monitor.pulseAlive ?? true
     });
+    const sentinel = this.sentinel.watch(monitor.liveState ?? this.seedState);
 
-    return Object.freeze({ runtime, omega });
+    // Record heals when the runtime recovers from failures.
+    if (runtime.checkpoint?.label === "failure-recovery") {
+      this.sentinel.recordHeal(RUNTIME_COMPONENT, "failure-recovery");
+    }
+
+    return Object.freeze({ runtime, omega, sentinel });
   }
 
   tick(monitor: SystemMonitorInput = {}): OmegaStatus {
@@ -68,6 +82,14 @@ export class IntegratedSystem {
 
   status(): OmegaStatus {
     return this.omega.status();
+  }
+
+  sentinelWatch(liveState?: Readonly<Record<string, unknown>>): SentinelWatchReport {
+    return this.sentinel.watch(liveState);
+  }
+
+  sentinelReport(liveState?: Readonly<Record<string, unknown>>): SentinelFullReport {
+    return this.sentinel.fullReport(liveState);
   }
 
   ledgerEntries(): readonly AuditEntry[] {

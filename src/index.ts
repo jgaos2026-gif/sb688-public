@@ -16,4 +16,5 @@ export * from "./failure/FailureManager";
 export * from "./runtime/BraidedRuntime";
 export * from "./system/IntegratedSystem";
 export * from "./server/SystemServer";
+export * from "./sentinel";
 export * from "./omega";
