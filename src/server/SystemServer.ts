@@ -844,7 +844,7 @@ agentMessageInput.addEventListener("keydown", function (event) {
 document.getElementById("agentDecideBtn").addEventListener("click", async function () {
   const question = agentDecideQuestion.value.trim();
   const options = agentDecideOptions.value
-    .split("\\n")
+    .split(/\\r?\\n/)
     .map(function (s) { return s.trim(); })
     .filter(function (s) { return s.length > 0; });
   if (!question) { agentDecideQuestion.focus(); return; }

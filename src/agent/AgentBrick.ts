@@ -140,7 +140,7 @@ export class AgentBrick {
 
     // Intent: greeting
     if (/\b(hello|hi|hey|greetings)\b/.test(lower)) {
-      return `Hello. I am ${this._config.name} — ${this._config.persona} How can I assist you today?`;
+      return `Hello. I am ${this._config.name} — ${this._config.persona}. How can I assist you today?`;
     }
 
     // Intent: capability inquiry
