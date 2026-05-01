@@ -209,7 +209,11 @@ test("integrated system sentinelWatch returns clean report on healthy system", (
 test("integrated system sentinelReport provides full adaptation data", async () => {
   const system = new IntegratedSystem();
 
-  // Simulate multiple failure-recovery requests to build incident memory.
+  // The text "force-brain-failure after successful governance checks" is the
+  // special trigger recognised by DefaultBrainAdapter that causes a BRAIN_FAILURE
+  // followed by failure-recovery (see failure-loop.test.ts for the full trace).
+  // Each recovered request sets checkpoint.label === "failure-recovery", which
+  // IntegratedSystem.process() records as a heal incident for the sentinel.
   for (let i = 0; i < 3; i++) {
     await system.process({
       id: `sentinel-incident-${i}`,

@@ -351,6 +351,11 @@ class SentinelMetrics:
     and threat-prediction engine.
     """
 
+    # The Python simulator uses a higher threshold (0.55) than the TypeScript
+    # AnomalyDetector (0.40) because the Python test harness runs short, isolated
+    # scenarios (one fault per test) rather than accumulating faults across many
+    # requests.  A lower threshold would trigger false anomalies in these small
+    # windows.
     _ANOMALY_THRESHOLD = 0.55
 
     def __init__(self, window: int = 20) -> None:
@@ -766,7 +771,8 @@ class SovereignOS:
             self.bricks[brick_name].state["status"] = "mounted" if brick_name == "fs" else "running"
 
         if self.sentinel:
-            action = self.healing.heal_log[-1][1] if self.healing.heal_log else "heal"
+            last = self.healing.heal_log[-1] if self.healing.heal_log else None
+            action = last[1] if last and len(last) >= 2 else "heal"
             self.sentinel.on_heal(brick_name, action)
 
         downstream_ok = self.healing.rerun_downstream(brick_name)

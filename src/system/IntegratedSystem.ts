@@ -33,6 +33,8 @@ const DEFAULT_SEED: Readonly<Record<string, unknown>> = Object.freeze({
   bricks: ["SEED", "GHOST", "ARMOR", "CROWN"]
 });
 
+const RUNTIME_COMPONENT = "braided-runtime" as const;
+
 export class IntegratedSystem {
   private readonly ledger: AuditLedger;
   private readonly runtime: BraidedRuntime;
@@ -61,7 +63,7 @@ export class IntegratedSystem {
 
     // Record heals when the runtime recovers from failures.
     if (runtime.checkpoint?.label === "failure-recovery") {
-      this.sentinel.recordHeal("braided-runtime", "failure-recovery");
+      this.sentinel.recordHeal(RUNTIME_COMPONENT, "failure-recovery");
     }
 
     return Object.freeze({ runtime, omega, sentinel });
