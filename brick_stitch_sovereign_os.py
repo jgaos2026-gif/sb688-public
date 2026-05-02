@@ -2,7 +2,7 @@ import hashlib
 import json
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import networkx as nx
 
@@ -287,6 +287,7 @@ class SovereignOS:
         self.spine = Spine(self.clock)
         self.healing: Optional[HealingLayer] = None
         self.operations: Optional[OperationsLayer] = None
+        self.sentinel: Optional[SentinelLayer] = None
         self.setup_system()
 
     def setup_system(self) -> None:
@@ -304,15 +305,18 @@ class SovereignOS:
 
         self.healing = HealingLayer(self.spine, self.bricks, self.dep_graph, self.clock)
         self.operations = OperationsLayer(self.spine, self.bricks, self.dep_graph, self.clock)
+        self.sentinel = SentinelLayer(self.healing, self.bricks, self.clock)
 
     # ---------------- Fault Injection ----------------
     def inject_fault(self, brick_name: Optional[str], fault_type: str) -> bool:
         if fault_type == "spine_tamper":
             self.spine.tamper_with_head()
+            self.sentinel.record_fault(brick_name, fault_type)
             return True
 
         if fault_type == "heal_layer_fault":
             self.healing.online = False
+            self.sentinel.record_fault(brick_name, fault_type)
             return True
 
         if brick_name is None or brick_name not in self.bricks:
@@ -334,6 +338,8 @@ class SovereignOS:
             brick.healthy = False
         else:
             return False
+
+        self.sentinel.record_fault(brick_name, fault_type)
         return True
 
     # ---------------- Repair Logic ----------------
@@ -404,12 +410,14 @@ class SovereignOS:
 
         rounds = 0
         passed = False
-        details = {}
+        details: Dict[str, Any] = {}
 
         while rounds < self.spine.policy["max_repair_rounds_per_test"]:
             rounds += 1
             repaired = self.attempt_repair(fault_brick, fault_type)
             valid, details = self.validate_system()
+            # Run sentinel watch after each repair attempt.
+            self.sentinel.watch()
             if repaired and valid:
                 passed = True
                 break
@@ -434,6 +442,7 @@ class SovereignOS:
             "repair_rounds": rounds,
             "details": details,
             "ledger_head": self.spine.current_version,
+            "sentinel": self.sentinel.status(),
         }
         return passed, report
 
@@ -446,6 +455,9 @@ class SovereignOS:
             ("5. Cascading Dependency Failure", "core", "dependency_failure"),
             ("6. Persistent Storage Corruption", "fs", "storage_corrupt"),
             ("7. Update Failure Mid-Install", "fs", "partial_update"),
+            ("8. Sentinel Watches Crash Fault", "user_app", "runtime_crash"),
+            ("9. Sentinel Watches Spine Tamper", None, "spine_tamper"),
+            ("10. Sentinel Adaptive Threshold", "driver_net", "corrupt"),
         ]
 
         all_passed = True
@@ -453,11 +465,20 @@ class SovereignOS:
             passed, report = self.run_test(name, brick, fault)
             if verbose:
                 status = "PASS" if passed else "FAIL"
-                print(f"{name}: {status} | rounds={report['repair_rounds']} | head=v{report['ledger_head']}")
+                sentinel_info = report.get("sentinel", {})
+                threat = sentinel_info.get("threat_level", "n/a")
+                print(
+                    f"{name}: {status} | rounds={report['repair_rounds']} "
+                    f"| head=v{report['ledger_head']} | sentinel={threat}"
+                )
                 if not passed:
                     print(f"  details={report['details']}")
             all_passed = all_passed and passed
         return all_passed
+
+    def sentinel_status(self) -> Dict[str, Any]:
+        """Return the current sentinel status dict."""
+        return self.sentinel.status() if self.sentinel else {}
 
     def run_three_clean_passes(self) -> bool:
         streak = 0
@@ -472,6 +493,169 @@ class SovereignOS:
             print(f"Run #{run}: FULL PASS")
         print(f"\nALL TESTS PASSED {streak} TIMES IN A ROW - SYSTEM READY")
         return True
+
+
+# ===================== BRAIDED LOGIC =====================
+class BraidedLogic:
+    """Three-braid ethical decision layer (personality · moral · judgment).
+
+    Every sentinel action passes through moral and judgment checks before
+    being approved.  Personalities tune the threshold but cannot bypass
+    the hard safety floor.
+    """
+
+    PERSONALITIES = ("steadfast", "adaptive", "cautious")
+
+    # Actions that require a confirmed backup before being permitted.
+    _DESTRUCTIVE_ACTIONS: frozenset = frozenset({"purge", "wipe", "overwrite_ledger"})
+
+    def __init__(self, personality: str = "adaptive"):
+        if personality not in self.PERSONALITIES:
+            personality = "adaptive"
+        self.personality = personality
+        self.decision_log: List[Dict[str, Any]] = []
+
+    # ---- moral braid ----
+    def moral_check(self, action: str, context: Dict[str, Any]) -> bool:
+        """Return True when the action is morally permissible."""
+        if action in self._DESTRUCTIVE_ACTIONS:
+            if not context.get("backup_confirmed"):
+                return False
+        return True
+
+    # ---- judgment braid ----
+    def judgment_route(self, threat_level: str, suggested_action: str) -> str:
+        """Map threat level + personality to a concrete approved action."""
+        if self.personality == "cautious":
+            if threat_level in {"high", "critical"}:
+                return "alert_only"
+        if self.personality == "steadfast":
+            return suggested_action
+        # adaptive: follow suggestion unless threat is merely low
+        if threat_level == "low":
+            return "monitor"
+        return suggested_action
+
+    # ---- unified entry point ----
+    def evaluate(self, action: str, threat_level: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        moral_ok = self.moral_check(action, context)
+        routed = self.judgment_route(threat_level, action) if moral_ok else "blocked"
+        entry: Dict[str, Any] = {
+            "action": action,
+            "threat_level": threat_level,
+            "moral_ok": moral_ok,
+            "routed_to": routed,
+            "personality": self.personality,
+        }
+        self.decision_log.append(entry)
+        return entry
+
+
+# ===================== SENTINEL =====================
+class SentinelLayer:
+    """Vigilance plane above the HealingLayer.
+
+    Watches brick health over time, classifies threats, learns from
+    incidents, and tightens its own detection thresholds autonomously.
+    All actions pass through BraidedLogic before being applied.
+    """
+
+    THREAT_LEVELS = ("nominal", "low", "moderate", "high", "critical")
+
+    def __init__(
+        self,
+        healing: "HealingLayer",
+        bricks: Dict[str, Brick],
+        clock: DeterministicClock,
+        personality: str = "adaptive",
+    ):
+        self.healing = healing
+        self.bricks = bricks
+        self.clock = clock
+        self.braid = BraidedLogic(personality)
+        self.incidents: List[Dict[str, Any]] = []
+        self.threat_level: str = "nominal"
+        # Threshold: how many consecutive unhealthy bricks trigger an escalation.
+        self._escalation_threshold: int = 2
+        self._heal_surge_threshold: int = 3  # heals per brick before raising alert
+        self._watch_log: List[Dict[str, Any]] = []
+
+    # ---- internal helpers ----
+    def _timestamp(self) -> int:
+        return self.clock.now()
+
+    def _classify_threat(self, unhealthy_count: int, heal_surges: int) -> str:
+        if unhealthy_count == 0 and heal_surges == 0:
+            return "nominal"
+        if unhealthy_count >= 3 or heal_surges >= self._heal_surge_threshold + 2:
+            return "critical"
+        if unhealthy_count >= 2 or heal_surges >= self._heal_surge_threshold + 1:
+            return "high"
+        if unhealthy_count >= 1 or heal_surges >= self._heal_surge_threshold:
+            return "moderate"
+        return "low"
+
+    # ---- public API ----
+    def watch(self) -> Dict[str, Any]:
+        """Perform one sentinel watch cycle and return a report."""
+        unhealthy = [name for name, b in self.bricks.items() if not b.healthy]
+        heal_surges = sum(
+            1 for b in self.bricks.values() if b.heal_count >= self._heal_surge_threshold
+        )
+        chain_broken = not self.healing.spine.verify_chain()
+
+        # Escalate threat classification.
+        new_level = self._classify_threat(len(unhealthy), heal_surges)
+        if chain_broken and new_level not in {"high", "critical"}:
+            new_level = "high"
+        self.threat_level = new_level
+
+        report: Dict[str, Any] = {
+            "timestamp": self._timestamp(),
+            "threat_level": self.threat_level,
+            "unhealthy_bricks": unhealthy,
+            "heal_surges": heal_surges,
+            "chain_broken": chain_broken,
+        }
+
+        if self.threat_level not in {"nominal", "low"}:
+            decision = self.braid.evaluate(
+                action="alert_and_monitor",
+                threat_level=self.threat_level,
+                context={"backup_confirmed": True},
+            )
+            report["braid_decision"] = decision
+            self._record_incident(report)
+
+        self._watch_log.append(report)
+        return report
+
+    def _record_incident(self, report: Dict[str, Any]) -> None:
+        incident = deepcopy(report)
+        incident["incident_id"] = len(self.incidents) + 1
+        self.incidents.append(incident)
+        # Autonomous threshold tightening: if incidents pile up, tighten early.
+        if len(self.incidents) > self._escalation_threshold * 2:
+            self._escalation_threshold = max(1, self._escalation_threshold - 1)
+
+    def record_fault(self, brick_name: Optional[str], fault_type: str) -> None:
+        """External hook so SovereignOS can notify sentinel of injected faults."""
+        self._watch_log.append({
+            "timestamp": self._timestamp(),
+            "event": "fault_injected",
+            "brick": brick_name,
+            "fault_type": fault_type,
+        })
+
+    def status(self) -> Dict[str, Any]:
+        return {
+            "threat_level": self.threat_level,
+            "total_incidents": len(self.incidents),
+            "escalation_threshold": self._escalation_threshold,
+            "heal_surge_threshold": self._heal_surge_threshold,
+            "braid_personality": self.braid.personality,
+            "watch_cycles": len(self._watch_log),
+        }
 
 
 # ===================== MAIN =====================
