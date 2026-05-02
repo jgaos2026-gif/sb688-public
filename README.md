@@ -3,6 +3,7 @@
 
 [![status](https://img.shields.io/badge/status-SB689__READY-gold)](docs/WHITEPAPER.md)
 [![license](https://img.shields.io/badge/license-source--available%20%2F%20commercial-black)](LICENSE)
+[![android](https://img.shields.io/badge/android-Kivy%20%2F%20Buildozer-green)](docs/ANDROID.md)
 
 > *Sb688 — when I say connect to the stitch, show how you feel. We're going live. Let's sell it.*
 
@@ -18,6 +19,9 @@ SB689 OMEGA stitches two layers into one runtime:
    hardened bricks (Seed · Ghost · Armor · Crown) bound by a signed
    Stitch and driven by `Verify_Stitch → Mirror_State → Monitor_Drift`
    with a `kill → activate → re-stitch → signal` fail-state.
+3. **Sentinel Self-Awareness** — `BraidedLogic` + `SentinelLayer` provide
+   proactive health monitoring, anomaly detection, threat classification,
+   and autonomous threshold tightening above the healing plane.
 
 It implements the public vocabulary of the
 [SB688 National Resilience Council](https://www.jgaos2026-gif.com)
@@ -49,9 +53,14 @@ src/
   truth/        Liquid Truth Node Mesh
   utils/        Stable hash + clock
 
+brick_stitch_sovereign_os.py   Core Python OS simulator + Sentinel layer
+android_app.py                 Kivy Android UI (touch-compatible)
+buildozer.spec                 Android APK build configuration
+requirements.txt               Python runtime dependencies
 demo/           Runnable end-to-end demo
 test/           node:test suite (core, failure, ledger, quantum, omega)
 docs/           Whitepaper, architecture, attribution, governance, security, press kit
+  ANDROID.md    Android build & deployment guide
 ```
 
 ## Commands
@@ -65,6 +74,24 @@ npm run system     # build + run full backend + frontend console on :6890
 ```
 
 Open `http://127.0.0.1:6890` for the complete system console.
+
+### Python / Android
+
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Run headless core OS validation (3-pass, 10 scenarios)
+python brick_stitch_sovereign_os.py
+
+# Run Kivy UI on the desktop (for development/testing)
+python android_app.py
+
+# Build Android APK (requires Buildozer + Android NDK/SDK)
+buildozer android debug
+```
+
+See [docs/ANDROID.md](docs/ANDROID.md) for full Android setup instructions.
 
 ## Quick taste
 
@@ -87,6 +114,7 @@ const handshake = omega.connectToStitch();
 
 - [docs/WHITEPAPER.md](docs/WHITEPAPER.md) — protocol & evidence labels
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — module map
+- [docs/ANDROID.md](docs/ANDROID.md) — Android build & deployment
 - [docs/SECURITY.md](docs/SECURITY.md) — what is and is not claimed
 - [docs/GOVERNANCE.md](docs/GOVERNANCE.md) — change classes, PR rules
 - [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md) — concept attribution
@@ -99,6 +127,7 @@ const handshake = omega.connectToStitch();
 |--------|-------|
 | `CORE_OS_TARGET` | 32 MB RAM flip |
 | `CPU_TARGET` | 8 GB chip, hardware agnostic |
+| `ANDROID_TARGET` | API 26+ (Android 8.0+), arm64-v8a + armeabi-v7a |
 | `failure_tolerance` | zero |
 | `resurrection_speed` | hardware-interrupt class |
 | `STATUS` | `SB689_READY` |
