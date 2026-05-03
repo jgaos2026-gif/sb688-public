@@ -17,3 +17,4 @@ export * from "./runtime/BraidedRuntime";
 export * from "./system/IntegratedSystem";
 export * from "./server/SystemServer";
 export * from "./omega";
+export * from "./agent";
