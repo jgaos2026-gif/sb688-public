@@ -1,4 +1,9 @@
 title: "SB689 OMEGA · Sovereign Stitch"
 description: "A resilience runtime by John Arenz (J.G.A.) — Elegance with Consequences."
-theme: jekyll-theme-midnight
-show_downloads: true
+url: "https://jgaos2026-gif.github.io"
+baseurl: "/sb688-public"
+show_downloads: false
+# Custom HTML landing page (docs/index.html) is served directly;
+# no Jekyll theme is applied to it.
+exclude:
+  - index.md
