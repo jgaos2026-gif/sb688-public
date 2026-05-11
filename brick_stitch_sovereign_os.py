@@ -531,7 +531,11 @@ class SovereignOS:
         }
 
     def run_all_tests_once(self, verbose: bool = True, include_extreme: bool = False, extreme_months: int = 6) -> bool:
-        """Run the standard suite once, with optional extreme-environment endurance."""
+        """Run the standard suite once, with optional extreme-environment endurance.
+
+        include_extreme: when True, append the extreme endurance simulation to the run.
+        extreme_months: number of simulated months used by the extreme endurance path.
+        """
         tests = [
             ("1. Runtime Process Corruption", "user_app", "corrupt"),
             ("2. Driver-Level Fault", "driver_net", "driver_fault"),
