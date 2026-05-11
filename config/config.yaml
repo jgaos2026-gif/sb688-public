@@ -1,0 +1,22 @@
+# SB689 OMEGA · Sovereign Stitch — Runtime Configuration
+# --------------------------------------------------------
+# This file is loaded at startup by sovereign_stitch_pc.py.
+# Values here seed the OmegaSupervisor's golden image state.
+
+protocol: "SB689_OMEGA"
+owner: "JGA"
+version: "1.0.0"
+
+# Tick loop settings
+default_cycles: 5
+tick_pause_ms: 50
+
+# Drift threshold (ratio — must match ArmorBrick.DRIFT_THRESHOLD = 0.0001)
+drift_threshold: 0.0001
+
+# Ghost brick ring-buffer depth
+ghost_max_frames: 8
+
+# Logging
+log_level: "INFO"
+emit_json: false

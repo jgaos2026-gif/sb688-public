@@ -1,0 +1,54 @@
+# SB689 OMEGA · Sovereign Stitch — Governing Constitution
+# --------------------------------------------------------
+# Immutable principles that govern the Sovereign Stitch runtime.
+# These values are never written by the program — they are read-only
+# reference truth for human auditors and automated compliance checks.
+
+governing_body: "National Resilience Council / Jay's Graphic Arts"
+author: "John Arenz (J.G.A.)"
+effective_date: "2026-01-01"
+
+articles:
+
+  - id: "ART-001"
+    title: "Zero Failure Tolerance"
+    text: >
+      The Sovereign Stitch runtime operates with failure_tolerance = zero.
+      Any detected breach — drift > 0.01% or pulse == 0 — triggers an
+      immediate hardware-interrupt-class resurrection sequence.
+
+  - id: "ART-002"
+    title: "Seed Immutability"
+    text: >
+      BRICK_A_SEED is forged once at boot and never overwritten.
+      Its checksum is the sole trusted reference for drift measurement.
+      Resurrection always re-derives the binding chain from the sealed seed.
+
+  - id: "ART-003"
+    title: "Ghost Shadow Priority"
+    text: >
+      During resurrection the BRICK_B_GHOST shadow frame captured *before*
+      the breach is used as the restore target.  Tampered live state must
+      never re-enter the trusted chain.
+
+  - id: "ART-004"
+    title: "Audit Transparency"
+    text: >
+      Every transition — boot, stable tick, drift detection, resurrection,
+      handshake — is appended to the internal audit log with a timestamp
+      and detail payload.  Logs are append-only within a session.
+
+  - id: "ART-005"
+    title: "Brain Non-Rulership"
+    text: >
+      The Brain adapter is bound to the approved braid signature and cannot
+      issue governance directives.  Sovereign authority rests with the
+      Spine and the governing constitution, not the inference layer.
+
+  - id: "ART-006"
+    title: "Elegance with Consequences"
+    text: >
+      All public APIs must maintain the canonical ready-message handshake:
+      "Sb688 when I say connect to the stitch show how you feel
+       we're going live lets sell it."
+      This message is signed by the stitch manifest on every connection.
