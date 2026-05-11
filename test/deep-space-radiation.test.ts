@@ -1,7 +1,7 @@
 /**
  * Deep Space Radiation Endurance Suite
  *
- * Simulates 6 years of continuous deep-space operation (2 192 daily cycles)
+ * Simulates 6 years of continuous deep-space operation (2,192 daily cycles)
  * against the SB689 Omega layer and the SB689 Braided Runtime.
  *
  * Threat model reproduced here:
@@ -13,7 +13,7 @@
  *   GOA   — Governance-override attempt in brain output (hallucination in runtime)
  *
  * Invariants verified at every breach event and at full-soak end:
- *   1. Ledger hash chain is valid for the entire 2 192-cycle run.
+ *   1. Ledger hash chain is valid for the entire 2,192-cycle run.
  *   2. seed.selfCheck() always returns true (golden image is immutable in memory).
  *   3. seed.verify(originalState) always returns true.
  *   4. cleanSeedChecksum in every ResurrectionEvent equals the sealed seed checksum.
@@ -288,7 +288,7 @@ test("deep-space: system restores GREEN crown after any radiation event on next 
 });
 
 // ---------------------------------------------------------------------------
-// Test 8 — 6-year radiation soak (2 192 daily cycles, deterministic RNG)
+// Test 8 — 6-year radiation soak (2,192 daily cycles, deterministic RNG)
 //
 // Per-cycle threat schedule (LCG seed 0xDEAD_BEEF):
 //   ~3 % daily SEU probability  → ~66 events
@@ -307,7 +307,7 @@ test("deep-space: 6-year / 2192-cycle radiation soak — seed and ledger survive
   const { omega, ledger, seedChecksum } = newOmega();
   const rand = lcg(0xdeadbeef);
 
-  const DAYS = Math.round(6 * 365.25); // 2 192
+  const DAYS = Math.round(6 * 365.25); // 2,192
   const SEU_PROB = 0.03;
   const PULSE_LOSS_PROB = 0.01;
   const STORM_START_DOY = 183; // mid-year storm start (day-of-year)
