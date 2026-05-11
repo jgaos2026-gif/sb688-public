@@ -615,7 +615,7 @@ class SovereignOS:
         return True
 
     def run_extreme_qualification(self, months: int = 6, consecutive_passes: int = 5) -> bool:
-        """Backward-compatible alias for extreme full-suite qualification runs."""
+        """Alias for extreme full-suite qualification runs."""
         return self.run_full_suite_with_extreme_qualification(months=months, consecutive_passes=consecutive_passes)
 
 
