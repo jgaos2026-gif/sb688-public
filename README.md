@@ -81,7 +81,7 @@ Open `http://127.0.0.1:6890` for the complete system console.
 # Install Python dependencies
 pip install -r requirements.txt
 
-# Run headless core OS validation (3-pass, 10 scenarios)
+# Run headless extreme qualification (6-month simulation + full suite, 5 passes)
 python brick_stitch_sovereign_os.py
 
 # Run Kivy UI on the desktop (for development/testing)
