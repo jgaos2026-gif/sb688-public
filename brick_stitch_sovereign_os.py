@@ -530,7 +530,7 @@ class SovereignOS:
             "sentinel": self.sentinel.status(),
         }
 
-    def run_all_tests_once(self, verbose: bool = True, include_extreme: bool = False, extreme_months: int = 6) -> bool:
+    def run_all_tests_once(self, verbose: bool = True, *, include_extreme: bool = False, extreme_months: int = 6) -> bool:
         """Run the standard suite once, with optional extreme-environment endurance.
 
         include_extreme: when True, append the extreme endurance simulation to the run.
