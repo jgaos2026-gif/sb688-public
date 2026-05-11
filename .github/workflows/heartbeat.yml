@@ -1,0 +1,30 @@
+name: heartbeat
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pulse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Verify repository heartbeat
+        run: npm ci
+      - name: Run health checks
+        run: npm test
+      - name: Verify public framework files
+        run: |
+          test -f README.md
+          test -f STITCH_BRIDGE.md
+          test -f CONSTITUTION.md
+          test -f SECTIONAL_LAWS.md
+          test -f LICENSE.md
