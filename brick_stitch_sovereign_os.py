@@ -530,12 +530,7 @@ class SovereignOS:
             "sentinel": self.sentinel.status(),
         }
 
-    def run_all_tests_once(self, verbose: bool = True, *, include_extreme: bool = False, extreme_months: int = 6) -> bool:
-        """Run the standard suite once, with optional extreme-environment endurance.
-
-        include_extreme: when True, append the extreme endurance simulation to the run.
-        extreme_months: number of simulated months used by the extreme endurance path.
-        """
+    def _run_all_tests(self, verbose: bool, include_extreme: bool, extreme_months: int) -> bool:
         tests = [
             ("1. Runtime Process Corruption", "user_app", "corrupt"),
             ("2. Driver-Level Fault", "driver_net", "driver_fault"),
@@ -578,6 +573,14 @@ class SovereignOS:
             all_passed = all_passed and passed
         return all_passed
 
+    def run_all_tests_once(self, verbose: bool = True) -> bool:
+        """Run the standard 10-scenario suite once."""
+        return self._run_all_tests(verbose=verbose, include_extreme=False, extreme_months=6)
+
+    def run_all_tests_with_extreme(self, verbose: bool = True, extreme_months: int = 6) -> bool:
+        """Run the standard suite plus extreme-environment endurance simulation."""
+        return self._run_all_tests(verbose=verbose, include_extreme=True, extreme_months=extreme_months)
+
     def sentinel_status(self) -> Dict[str, Any]:
         """Return the current sentinel status dict."""
         return self.sentinel.status() if self.sentinel else {}
@@ -596,13 +599,13 @@ class SovereignOS:
         print(f"\nALL TESTS PASSED {streak} TIMES IN A ROW - SYSTEM READY")
         return True
 
-    def run_extreme_qualification(self, months: int = 6, consecutive_passes: int = 5) -> bool:
+    def run_full_suite_with_extreme_qualification(self, months: int = 6, consecutive_passes: int = 5) -> bool:
         """Execute full-suite + extreme endurance qualification for consecutive passes."""
         streak = 0
         for run in range(1, consecutive_passes + 1):
             print(f"\n--- EXTREME QUALIFICATION RUN #{run} ---")
             fresh = SovereignOS()
-            passed = fresh.run_all_tests_once(verbose=True, include_extreme=True, extreme_months=months)
+            passed = fresh.run_all_tests_with_extreme(verbose=True, extreme_months=months)
             if not passed:
                 print(f"Extreme qualification run #{run}: FAIL")
                 return False
@@ -610,6 +613,10 @@ class SovereignOS:
             print(f"Extreme qualification run #{run}: FULL PASS")
         print(f"\nEXTREME 6-MONTH SIMULATION + FULL SUITE PASSED {streak} TIMES IN A ROW - SYSTEM READY")
         return True
+
+    def run_extreme_qualification(self, months: int = 6, consecutive_passes: int = 5) -> bool:
+        """Backward-compatible alias for extreme full-suite qualification runs."""
+        return self.run_full_suite_with_extreme_qualification(months=months, consecutive_passes=consecutive_passes)
 
 
 # ===================== BRAIDED LOGIC =====================
@@ -780,4 +787,4 @@ if __name__ == "__main__":
     print("Brick Stitch Sovereign OS - Hardened Single-File Validation Harness")
     print("Deterministic clock, chained Spine ledger, per-brick rollback, DAG-aware healing.")
     print("Running 6-month extreme-environment simulation + full suite for 5 consecutive passes.\n")
-    SovereignOS().run_extreme_qualification(months=6, consecutive_passes=5)
+    SovereignOS().run_full_suite_with_extreme_qualification(months=6, consecutive_passes=5)
