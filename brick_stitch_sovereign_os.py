@@ -447,6 +447,12 @@ class SovereignOS:
         return passed, report
 
     def run_extreme_environment_simulation(self, months: int = 6, verbose: bool = True) -> Tuple[bool, Dict[str, Any]]:
+        """Run a month-by-month endurance simulation across extreme environments.
+
+        Applies a rotating stress profile (space, sea, land, underwater, cosmic-ray burst,
+        and compound worst-case events), attempts automated repair/recovery, and validates
+        health + ledger integrity after each month.
+        """
         self.setup_system()
         boot_ok = self.operations.boot()
         if not boot_ok:
@@ -587,6 +593,7 @@ class SovereignOS:
         return True
 
     def run_extreme_qualification(self, months: int = 6, passes: int = 5) -> bool:
+        """Execute full-suite + extreme endurance qualification for consecutive passes."""
         streak = 0
         for run in range(1, passes + 1):
             print(f"\n--- EXTREME QUALIFICATION RUN #{run} ---")
