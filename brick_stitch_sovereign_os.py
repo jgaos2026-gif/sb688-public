@@ -450,7 +450,7 @@ class SovereignOS:
         self.setup_system()
         boot_ok = self.operations.boot()
         if not boot_ok:
-            return False, {"test": "11. Extreme Environment Endurance (6-Month)", "reason": "boot_failed"}
+            return False, {"test": "11. Extreme Environment Endurance (6-Month)", "months": months, "reason": "boot_failed"}
 
         monthly_stress_plan: List[Tuple[str, List[Tuple[Optional[str], str]]]] = [
             ("Space vacuum + thermal cycling", [("core", "dependency_failure"), ("driver_net", "driver_fault")]),
@@ -509,6 +509,7 @@ class SovereignOS:
             if not month_ok:
                 return False, {
                     "test": "11. Extreme Environment Endurance (6-Month)",
+                    "months": months,
                     "month": month,
                     "profile": profile_name,
                     "details": details,
@@ -524,6 +525,7 @@ class SovereignOS:
         }
 
     def run_all_tests_once(self, verbose: bool = True, include_extreme: bool = False, extreme_months: int = 6) -> bool:
+        """Run the standard suite once, with optional extreme-environment endurance."""
         tests = [
             ("1. Runtime Process Corruption", "user_app", "corrupt"),
             ("2. Driver-Level Fault", "driver_net", "driver_fault"),
@@ -557,7 +559,7 @@ class SovereignOS:
             if verbose:
                 status = "PASS" if passed else "FAIL"
                 print(
-                    f"{report['test']}: {status} | months={report.get('months', extreme_months)} "
+                    f"{report['test']}: {status} | months={report['months']} "
                     f"| head=v{report.get('ledger_head', self.spine.current_version)} "
                     f"| sentinel={report.get('sentinel', {}).get('threat_level', 'n/a')}"
                 )
