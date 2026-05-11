@@ -596,10 +596,10 @@ class SovereignOS:
         print(f"\nALL TESTS PASSED {streak} TIMES IN A ROW - SYSTEM READY")
         return True
 
-    def run_extreme_qualification(self, months: int = 6, passes: int = 5) -> bool:
+    def run_extreme_qualification(self, months: int = 6, consecutive_passes: int = 5) -> bool:
         """Execute full-suite + extreme endurance qualification for consecutive passes."""
         streak = 0
-        for run in range(1, passes + 1):
+        for run in range(1, consecutive_passes + 1):
             print(f"\n--- EXTREME QUALIFICATION RUN #{run} ---")
             fresh = SovereignOS()
             passed = fresh.run_all_tests_once(verbose=True, include_extreme=True, extreme_months=months)
@@ -780,4 +780,4 @@ if __name__ == "__main__":
     print("Brick Stitch Sovereign OS - Hardened Single-File Validation Harness")
     print("Deterministic clock, chained Spine ledger, per-brick rollback, DAG-aware healing.")
     print("Running 6-month extreme-environment simulation + full suite for 5 consecutive passes.\n")
-    SovereignOS().run_extreme_qualification(months=6, passes=5)
+    SovereignOS().run_extreme_qualification(months=6, consecutive_passes=5)
