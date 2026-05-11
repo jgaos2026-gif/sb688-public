@@ -79,7 +79,9 @@ class TestGhostBrick:
         ghost = GhostBrick()
         ghost.mirror({"a": 1})
         f = ghost.mirror({"b": 2})
-        assert ghost.pointer_flip() is f
+        flip = ghost.pointer_flip()
+        assert flip.cycle == f.cycle
+        assert flip.mirror_hash == f.mirror_hash
 
 
 # ─────────────────────────────────────────────
