@@ -1,8 +1,6 @@
 {
-  "_schema": "FINANCE_LEDGER_EXTERNAL — not the SB689 AuditLedger/AuditTransition schema",
   "action_type": "RECONCILE_STRIPE_PAYOUT_TO_BLUEVINE_DEPOSIT",
   "evidence_label": "VERIFIED",
-  "policy_id": "FINANCE_STRIPE_DAILY_RECONCILIATION",
   "refs": {
     "stripe_payout_id": "po_...",
     "stripe_balance_txn_ids": ["txn_..."],
@@ -31,4 +29,22 @@
     "permit": true,
     "reason": "delta within tolerance"
   }
+    "delta": 0
+  },
+  "policy_decision": {
+    "policy_id": "FINANCE_STRIPE_DAILY_RECONCILIATION",
+    "permit": true,
+    "reason": "Auto-reconcile within tolerance"
+  },
+  "tolerance": {
+    "max_delta": 1.00,
+    "currency": "USD"
+  },
+  "timestamps": {
+    "window_start": "YYYY-MM-DDT00:00:00Z",
+    "window_end": "YYYY-MM-DDT23:59:59Z",
+    "reconciled_at": "YYYY-MM-DDT06:00:00Z"
+  },
+  "prev_hash": "",
+  "hash": ""
 }

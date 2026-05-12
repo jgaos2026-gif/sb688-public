@@ -1,0 +1,18 @@
+# Sovereign OS — Python runtime dependencies
+#
+# For desktop development and testing:
+#   pip install -r requirements.txt
+#
+# For Android packaging, dependencies are declared in buildozer.spec
+# under the `requirements` key (Buildozer handles cross-compilation).
+
+# Core OS dependency
+networkx>=3.0
+
+# Android / desktop UI toolkit
+# On Android this is installed automatically by Buildozer.
+# For desktop testing: pip install kivy
+kivy>=2.3.0
+
+# Buildozer — Android APK packaging tool (dev-machine only, not on device)
+# Install separately:  pip install buildozer

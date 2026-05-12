@@ -3,11 +3,13 @@ version: 2
 
 time_basis:
   source: stripe.charge.created
+  source: stripe.charge.created   # unix timestamp / ISO time from Stripe
   evaluation_clock: utc
   window_hours: 24
 
 refunds:
   auto_refunds_enabled: false
+  auto_refunds_enabled: false     # approval required
   within_window:
     decision: PERMIT_WITH_APPROVAL
   after_window:
@@ -22,3 +24,5 @@ required_logging:
     - charge_created_at
     - decision_at
     - reason
+    - decision_timestamp
+    - decision_reason
