@@ -213,6 +213,7 @@ if __name__ == "__main__":
         test_dispatch_stored_file,
         test_dispatch_unknown_file,
         test_dispatch_invalid_destination,
+        test_dispatch_rejects_path_separator_in_destination,
         test_upload_log_is_tamper_evident,
         test_upload_log_detects_tampering,
         test_sovereign_os_has_upload_brick,
