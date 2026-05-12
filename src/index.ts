@@ -18,4 +18,5 @@ export * from "./system/IntegratedSystem";
 export * from "./server/SystemServer";
 export * from "./sentinel";
 export * from "./agent";
+export * from "./upload";
 export * from "./omega";

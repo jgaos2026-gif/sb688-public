@@ -1,6 +1,8 @@
 {
+  "_schema": "FINANCE_LEDGER_EXTERNAL — not the SB689 AuditLedger/AuditTransition schema",
   "action_type": "STRIPE_REFUND_DECISION",
   "evidence_label": "VERIFIED",
+  "policy_id": "STRIPE_REFUND_WINDOW",
   "refs": {
     "stripe_charge_id": "ch_...",
     "stripe_payment_intent_id": "pi_...",
@@ -11,14 +13,17 @@
     "decision_at": "YYYY-MM-DDTHH:MM:SSZ",
     "window_expires_at": "YYYY-MM-DDTHH:MM:SSZ"
   },
+  "amounts": {
+    "charge_amount": 0,
+    "refund_amount_requested": 0,
+    "currency": "USD"
+  },
   "policy": {
     "policy_id": "STRIPE_REFUND_WINDOW",
-    "time_basis": "stripe.charge.created",
+    "window_hours": 24,
     "evaluation_clock": "utc",
-    "hard_deadline_hours": 24,
-    "decision": "DENY",
-    "reason": "Refund window exceeded"
-  },
-  "prev_hash": "",
-  "hash": ""
+    "within_window": true,
+    "decision": "PERMIT_WITH_APPROVAL",
+    "reason": ""
+  }
 }

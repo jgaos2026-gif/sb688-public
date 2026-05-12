@@ -2,7 +2,7 @@ import hashlib
 import json
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import networkx as nx
 
@@ -851,6 +851,9 @@ class SovereignOS:
             ("5. Cascading Dependency Failure", "core", "dependency_failure"),
             ("6. Persistent Storage Corruption", "fs", "storage_corrupt"),
             ("7. Update Failure Mid-Install", "fs", "partial_update"),
+            ("8. Sentinel Watches Crash Fault", "user_app", "runtime_crash"),
+            ("9. Sentinel Watches Spine Tamper", None, "spine_tamper"),
+            ("10. Sentinel Adaptive Threshold", "driver_net", "corrupt"),
         ]
 
         all_passed = True
@@ -858,15 +861,121 @@ class SovereignOS:
             passed, report = self.run_test(name, brick, fault)
             if verbose:
                 status = "PASS" if passed else "FAIL"
-                sentinel_status = ""
-                if self.sentinel:
-                    watch = self.sentinel.watch()
-                    sentinel_status = f" | sentinel={watch['status']} anomaly={watch['anomaly']}"
-                print(f"{name}: {status} | rounds={report['repair_rounds']} | head=v{report['ledger_head']}{sentinel_status}")
+                sentinel_info = report.get("sentinel", {})
+                threat = sentinel_info.get("threat_level", "n/a")
+                print(
+                    f"{name}: {status} | rounds={report['repair_rounds']} "
+                    f"| head=v{report['ledger_head']} | sentinel={threat}"
+                )
                 if not passed:
                     print(f"  details={report['details']}")
             all_passed = all_passed and passed
         return all_passed
+
+    def run_extreme_environment_simulation(self, months: int = 6, verbose: bool = True) -> Tuple[bool, Dict[str, Any]]:
+        """Run a month-by-month endurance simulation across extreme environments.
+
+        Applies a rotating stress profile (space, sea, land, underwater, cosmic-ray burst,
+        and compound worst-case events), attempts automated repair/recovery, and validates
+        health + ledger integrity after each month.
+        """
+        self.setup_system()
+        boot_ok = self.operations.boot()
+        if not boot_ok:
+            return False, {"test": "11. Extreme Environment Endurance (6-Month)", "months": months, "reason": "boot_failed"}
+
+        monthly_stress_plan: List[Tuple[str, List[Tuple[Optional[str], str]]]] = [
+            ("Space vacuum + thermal cycling", [("core", "dependency_failure"), ("driver_net", "driver_fault")]),
+            ("Sea-salt corrosion + storm surge", [("fs", "storage_corrupt"), ("driver_net", "runtime_crash")]),
+            ("Land dust + seismic disruption", [("core", "runtime_crash"), ("user_app", "dependency_failure")]),
+            ("Underwater pressure + comms disruption", [("driver_net", "driver_fault"), ("fs", "partial_update")]),
+            ("Cosmic-ray burst + ledger integrity attack", [(None, "spine_tamper"), ("core", "corrupt")]),
+            ("Worst-case compound cascade", [(None, "heal_layer_fault"), ("user_app", "corrupt"), ("fs", "storage_corrupt"), ("core", "dependency_failure")]),
+        ]
+
+        month_reports: List[Dict[str, Any]] = []
+
+        for month in range(1, months + 1):
+            profile_name, events = monthly_stress_plan[(month - 1) % len(monthly_stress_plan)]
+            month_ok = True
+            month_rounds = 0
+
+            for brick_name, fault_type in events:
+                self.inject_fault(brick_name, fault_type)
+                repaired = False
+
+                for _ in range(self.spine.policy["max_repair_rounds_per_test"]):
+                    month_rounds += 1
+                    if self.attempt_repair(brick_name, fault_type):
+                        repaired = True
+                        break
+                    if self.sentinel:
+                        self.sentinel.watch()
+
+                if not repaired:
+                    month_ok = False
+                    break
+
+            valid, details = self.validate_system()
+            sentinel_report = self.sentinel.watch() if self.sentinel else {}
+            month_ok = month_ok and valid
+
+            month_report: Dict[str, Any] = {
+                "month": month,
+                "profile": profile_name,
+                "repair_rounds": month_rounds,
+                "passed": month_ok,
+                "details": details,
+                "sentinel": sentinel_report,
+                "ledger_head": self.spine.current_version,
+            }
+            month_reports.append(month_report)
+
+            if verbose:
+                status = "PASS" if month_ok else "FAIL"
+                threat = sentinel_report.get("threat_level", "n/a") if isinstance(sentinel_report, dict) else "n/a"
+                print(
+                    f"11.{month} Extreme Month {month} ({profile_name}): {status} "
+                    f"| rounds={month_rounds} | head=v{self.spine.current_version} "
+                    f"| sentinel={threat}"
+                )
+
+            if not month_ok:
+                return False, {
+                    "test": "11. Extreme Environment Endurance (6-Month)",
+                    "months": months,
+                    "month": month,
+                    "profile": profile_name,
+                    "details": details,
+                    "month_reports": month_reports,
+                }
+
+        return True, {
+            "test": "11. Extreme Environment Endurance (6-Month)",
+            "months": months,
+            "ledger_head": self.spine.current_version,
+            "month_reports": month_reports,
+            "sentinel": self.sentinel.status() if self.sentinel else {},
+        }
+
+    def run_all_tests_with_extreme(self, verbose: bool = True, extreme_months: int = 6) -> bool:
+        """Run the standard suite plus extreme-environment endurance simulation."""
+        all_passed = self.run_all_tests_once(verbose=verbose)
+        passed, report = self.run_extreme_environment_simulation(months=extreme_months, verbose=verbose)
+        if verbose:
+            status = "PASS" if passed else "FAIL"
+            print(
+                f"{report['test']}: {status} | months={report['months']} "
+                f"| head=v{report.get('ledger_head', self.spine.current_version)} "
+                f"| sentinel={report.get('sentinel', {}).get('threat_level', 'n/a')}"
+            )
+            if not passed:
+                print(f"  details={report.get('details')}")
+        return all_passed and passed
+
+    def sentinel_status(self) -> Dict[str, Any]:
+        """Return the current sentinel status dict."""
+        return self.sentinel.status() if self.sentinel else {}
 
     def run_three_clean_passes(self) -> bool:
         streak = 0
@@ -884,11 +993,31 @@ class SovereignOS:
         print(f"\nALL TESTS PASSED {streak} TIMES IN A ROW - SYSTEM READY")
         return True
 
+    def run_full_suite_with_extreme_qualification(self, months: int = 6, consecutive_passes: int = 5) -> bool:
+        """Execute full-suite + extreme endurance qualification for consecutive passes."""
+        streak = 0
+        for run in range(1, consecutive_passes + 1):
+            print(f"\n--- EXTREME QUALIFICATION RUN #{run} ---")
+            fresh = SovereignOS()
+            passed = fresh.run_all_tests_with_extreme(verbose=True, extreme_months=months)
+            if not passed:
+                print(f"Extreme qualification run #{run}: FAIL")
+                return False
+            streak += 1
+            print(f"Extreme qualification run #{run}: FULL PASS")
+        print(f"\nEXTREME 6-MONTH SIMULATION + FULL SUITE PASSED {streak} TIMES IN A ROW - SYSTEM READY")
+        return True
+
+    def run_extreme_qualification(self, months: int = 6, consecutive_passes: int = 5) -> bool:
+        """Alias for extreme full-suite qualification runs."""
+        return self.run_full_suite_with_extreme_qualification(months=months, consecutive_passes=consecutive_passes)
+
 
 # ===================== MAIN =====================
 if __name__ == "__main__":
     print("Brick Stitch Sovereign OS - Hardened Single-File Validation Harness")
     print("Deterministic clock, chained Spine ledger, per-brick rollback, DAG-aware healing.")
     print("Sentinel self-awareness: proactive monitoring, anomaly detection, ghost mirroring,")
-    print("braided ethical logic, omega resurrection loops, autonomous evolution.\n")
-    SovereignOS().run_three_clean_passes()
+    print("braided ethical logic, omega resurrection loops, autonomous evolution.")
+    print("Running 6-month extreme-environment simulation + full suite for 5 consecutive passes.\n")
+    SovereignOS().run_full_suite_with_extreme_qualification(months=6, consecutive_passes=5)

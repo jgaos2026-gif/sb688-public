@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AuditLedger, SentinelLayer, AnomalyDetector } from "../src";
+import { AuditLedger, SentinelLayer, AnomalyDetector, OmegaSupervisor } from "../src";
 import { IntegratedSystem } from "../src/system/IntegratedSystem";
 import { fixedClock } from "../src/utils/time";
 
@@ -227,4 +227,137 @@ test("integrated system sentinelReport provides full adaptation data", async () 
   assert.equal(report.incidentCount, 3);
   assert.equal(report.adaptation.evolved, true);
   assert.equal(report.adaptation.recommendations[0].component, "braided-runtime");
+});
+
+// ── SentinelMonitor tests ─────────────────────────────────────────────────────
+
+import { SentinelMonitor } from "../src/sentinel/SentinelMonitor";
+
+const monitorSeedState = {
+  protocol: "SB689_OMEGA",
+  owner: "JGA",
+  philosophy: "Elegance with Consequences",
+  bricks: ["SEED", "GHOST", "ARMOR", "CROWN"]
+} as const;
+
+function newOmegaForMonitor(): OmegaSupervisor {
+  let t = 0;
+  return new OmegaSupervisor({
+    ledger: new AuditLedger(),
+    seedState: monitorSeedState,
+    clock: fixedClock("2026-04-30T00:00:00.000Z"),
+    nowMs: () => (t += 0.00005)
+  });
+}
+
+test("SentinelMonitor reports NOMINAL threat level on healthy omega", () => {
+  const omega = newOmegaForMonitor();
+  const monitor = new SentinelMonitor({ clock: fixedClock("2026-04-30T00:00:00.000Z") });
+
+  const omegaStatus = omega.tick({ liveState: monitorSeedState, pulseAlive: true });
+  const report = monitor.monitor(omegaStatus);
+
+  assert.equal(report.threatLevel, "NOMINAL");
+  assert.equal(report.anomalies.length, 0);
+  assert.equal(report.selfHealTriggered, false);
+  assert.equal(report.incidentCount, 0);
+  assert.ok(report.recommendation.includes("healthy"));
+});
+
+test("SentinelMonitor detects resurrection event and escalates to WATCHFUL", () => {
+  const omega = newOmegaForMonitor();
+  const monitor = new SentinelMonitor({ clock: fixedClock("2026-04-30T00:00:00.000Z") });
+
+  const resurrectStatus = omega.tick({
+    liveState: { ...monitorSeedState, owner: "TAMPERED" },
+    pulseAlive: true
+  });
+
+  assert.equal(resurrectStatus.status, "SB689_RESURRECTING");
+  const report = monitor.monitor(resurrectStatus);
+
+  assert.equal(report.threatLevel, "WATCHFUL");
+  assert.ok(report.anomalies.length >= 1);
+  assert.ok(report.anomalies.some((a) => a.kind === "resurrection_event"));
+  assert.ok(report.incidentCount >= 1);
+});
+
+test("SentinelMonitor detects pulse loss and records anomaly", () => {
+  const omega = newOmegaForMonitor();
+  const monitor = new SentinelMonitor({ clock: fixedClock("2026-04-30T00:00:00.000Z") });
+
+  const pulseLostStatus = omega.tick({ liveState: monitorSeedState, pulseAlive: false });
+  const report = monitor.monitor(pulseLostStatus);
+
+  assert.ok(report.anomalies.some((a) => a.kind === "pulse_lost"));
+  assert.ok(["WATCHFUL", "ELEVATED", "CRITICAL"].includes(report.threatLevel));
+});
+
+test("SentinelMonitor detects resurrection surge and triggers self-heal", () => {
+  let t = 0;
+  const omega = new OmegaSupervisor({
+    ledger: new AuditLedger(),
+    seedState: monitorSeedState,
+    clock: fixedClock("2026-04-30T00:00:00.000Z"),
+    nowMs: () => (t += 0.00005)
+  });
+
+  const monitor = new SentinelMonitor({
+    clock: fixedClock("2026-04-30T00:00:00.000Z"),
+    initialAlertThreshold: 2
+  });
+
+  let lastReport = monitor.monitor(omega.tick({ liveState: { ...monitorSeedState, owner: "BAD" }, pulseAlive: true }));
+  lastReport = monitor.monitor(omega.tick({ liveState: { ...monitorSeedState, owner: "BAD" }, pulseAlive: true }));
+  lastReport = monitor.monitor(omega.tick({ liveState: { ...monitorSeedState, owner: "BAD" }, pulseAlive: true }));
+
+  assert.ok(
+    lastReport.threatLevel === "ELEVATED" || lastReport.threatLevel === "CRITICAL",
+    `Expected ELEVATED or CRITICAL, got ${lastReport.threatLevel}`
+  );
+  assert.equal(lastReport.selfHealTriggered, true);
+  assert.ok(lastReport.anomalies.some((a) => a.kind === "resurrection_surge"));
+});
+
+test("SentinelMonitor tightens alert threshold adaptively", () => {
+  let t = 0;
+  const omega = new OmegaSupervisor({
+    ledger: new AuditLedger(),
+    seedState: monitorSeedState,
+    clock: fixedClock("2026-04-30T00:00:00.000Z"),
+    nowMs: () => (t += 0.00005)
+  });
+
+  const monitor = new SentinelMonitor({
+    clock: fixedClock("2026-04-30T00:00:00.000Z"),
+    initialAlertThreshold: 3
+  });
+
+  for (let i = 0; i < 6; i++) {
+    monitor.monitor(omega.tick({ liveState: { ...monitorSeedState, owner: "BAD" }, pulseAlive: true }));
+  }
+
+  const latestReport = monitor.reportHistory().at(-1)!;
+  assert.ok(latestReport.alertThreshold < 3, `Expected threshold < 3, got ${latestReport.alertThreshold}`);
+});
+
+test("IntegratedSystem.tickWithSentinel() returns omega and sentinel monitor reports", () => {
+  const system = new IntegratedSystem();
+  const { omega, sentinel } = system.tickWithSentinel();
+
+  assert.equal(omega.status, "SB689_READY");
+  assert.equal(sentinel.threatLevel, "NOMINAL");
+  assert.equal(sentinel.selfHealTriggered, false);
+});
+
+test("IntegratedSystem.sentinelStatus() returns the most recent sentinel monitor report", async () => {
+  const system = new IntegratedSystem();
+
+  assert.equal(system.sentinelStatus(), undefined);
+
+  await system.process({ id: "sent-status-001", text: "Check sentinel status." });
+
+  const status = system.sentinelStatus();
+  assert.ok(status !== undefined);
+  assert.equal(status!.cycle, 1);
 });

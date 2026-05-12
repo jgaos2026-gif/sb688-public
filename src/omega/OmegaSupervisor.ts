@@ -6,6 +6,7 @@ import { GhostBrick } from "./GhostBrick";
 import { ArmorBrick } from "./ArmorBrick";
 import { CrownBrick } from "./CrownBrick";
 import { SovereignStitch } from "./SovereignStitch";
+import { SentinelLayer } from "./SentinelLayer";
 import type {
   DriftReport,
   OmegaStatus,
@@ -49,6 +50,7 @@ export class OmegaSupervisor {
   public readonly armor: ArmorBrick;
   public readonly crown: CrownBrick;
   public readonly stitch: SovereignStitch;
+  public readonly sentinel: SentinelLayer;
 
   private readonly ledger?: AuditLedger;
   private readonly clock: Clock;
@@ -67,6 +69,7 @@ export class OmegaSupervisor {
     this.armor = new ArmorBrick();
     this.crown = new CrownBrick(this.clock, "Idle");
     this.stitch = new SovereignStitch(this.seed, this.ghost, this.armor, this.crown, this.clock);
+    this.sentinel = new SentinelLayer({ clock: this.clock });
 
     // Prime the ghost so a pointer-flip is always available.
     this.ghost.mirror(deps.seedState);
@@ -113,6 +116,9 @@ export class OmegaSupervisor {
     }
     void frame;
 
+    // 4) Sentinel observation — record this tick's drift for self-awareness analysis.
+    this.sentinel.observe(this.cycle, this.lastDrift);
+
     this.crown.green(`Cycle ${this.cycle} stable.`, "Live_Sell");
     this.audit("omega.tick.stable", { cycle: this.cycle, mirrorHash: frame.mirrorHash });
     return this.status("SB689_READY");
@@ -137,7 +143,8 @@ export class OmegaSupervisor {
       lastDrift: this.lastDrift,
       lastResurrection: this.resurrections[this.resurrections.length - 1],
       stitch: this.stitch.current(),
-      targets: TARGETS
+      targets: TARGETS,
+      sentinel: this.sentinel.status()
     });
   }
 
@@ -180,6 +187,8 @@ export class OmegaSupervisor {
       elapsedMs: event.elapsedMs,
       ghostMirrorHash: event.ghostMirrorHash
     });
+    // Record the breach in the sentinel for self-awareness analysis.
+    this.sentinel.observe(this.cycle, this.lastDrift);
     return this.status("SB689_RESURRECTING");
   }
 

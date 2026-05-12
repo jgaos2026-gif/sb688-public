@@ -1,33 +1,34 @@
 {
+  "_schema": "FINANCE_LEDGER_EXTERNAL — not the SB689 AuditLedger/AuditTransition schema",
   "action_type": "RECONCILE_STRIPE_PAYOUT_TO_BLUEVINE_DEPOSIT",
   "evidence_label": "VERIFIED",
+  "policy_id": "FINANCE_STRIPE_DAILY_RECONCILIATION",
   "refs": {
     "stripe_payout_id": "po_...",
     "stripe_balance_txn_ids": ["txn_..."],
     "bluevine_transaction_id": "bv_...",
     "statement_period": "YYYY-MM"
   },
+  "timestamps": {
+    "stripe_payout_created_at": "YYYY-MM-DDTHH:MM:SSZ",
+    "stripe_payout_arrival_date": "YYYY-MM-DD",
+    "bluevine_deposit_cleared_at": "YYYY-MM-DDTHH:MM:SSZ",
+    "reconciled_at": "YYYY-MM-DDTHH:MM:SSZ"
+  },
   "amounts": {
     "gross_collected": 0,
     "stripe_fees": 0,
     "net_payout": 0,
     "bank_deposit_cleared": 0,
-    "delta": 0
-  },
-  "policy_decision": {
-    "policy_id": "FINANCE_STRIPE_DAILY_RECONCILIATION",
-    "permit": true,
-    "reason": "Auto-reconcile within tolerance"
-  },
-  "tolerance": {
-    "max_delta": 1.00,
+    "delta": 0,
     "currency": "USD"
   },
-  "timestamps": {
-    "window_start": "YYYY-MM-DDT00:00:00Z",
-    "window_end": "YYYY-MM-DDT23:59:59Z",
-    "reconciled_at": "YYYY-MM-DDT06:00:00Z"
+  "tolerance": {
+    "auto_verify_delta_max": 0.00,
+    "auto_commit_watch_delta_max": 1.00
   },
-  "prev_hash": "",
-  "hash": ""
+  "policy_decision": {
+    "permit": true,
+    "reason": "delta within tolerance"
+  }
 }

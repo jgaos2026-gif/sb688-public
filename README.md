@@ -3,6 +3,7 @@
 
 [![status](https://img.shields.io/badge/status-SB689__READY-gold)](docs/WHITEPAPER.md)
 [![license](https://img.shields.io/badge/license-source--available%20%2F%20commercial-black)](LICENSE)
+[![android](https://img.shields.io/badge/android-Kivy%20%2F%20Buildozer-green)](docs/ANDROID.md)
 
 > *Sb688 — when I say connect to the stitch, show how you feel. We're going live. Let's sell it.*
 
@@ -18,6 +19,9 @@ SB689 OMEGA stitches two layers into one runtime:
    hardened bricks (Seed · Ghost · Armor · Crown) bound by a signed
    Stitch and driven by `Verify_Stitch → Mirror_State → Monitor_Drift`
    with a `kill → activate → re-stitch → signal` fail-state.
+3. **Sentinel Self-Awareness** — `BraidedLogic` + `SentinelLayer` provide
+   proactive health monitoring, anomaly detection, threat classification,
+   and autonomous threshold tightening above the healing plane.
 
 It implements the public vocabulary of the
 [SB688 National Resilience Council](https://www.jgaos2026-gif.com)
@@ -59,12 +63,22 @@ docs/           Whitepaper, architecture, attribution, governance, security, pre
 ```bash
 npm install
 npm run build      # tsc -p tsconfig.json
-npm test           # build + node --test dist/test/**/*.test.js
+npm test           # build + node --test dist/test/*.test.js
 npm run demo       # build + node dist/demo/runDemo.js
 npm run system     # build + run full backend + frontend console on :6890
 ```
 
 Open `http://127.0.0.1:6890` for the complete system console.
+
+### Python / Android
+
+```bash
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Run headless extreme qualification (6-month simulation + full suite, 5 passes)
+python brick_stitch_sovereign_os.py
+```
 
 ## Quick taste
 

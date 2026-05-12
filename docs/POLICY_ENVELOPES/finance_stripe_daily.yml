@@ -1,12 +1,15 @@
 policy_id: FINANCE_STRIPE_DAILY_RECONCILIATION
 version: 1
+
 scope:
   systems:
     - stripe
     - bluevine
+
 schedule:
   cadence: daily
-  run_time_utc: "06:00"
+  run_time_local: "06:00"
+  timezone: "America/Chicago"  # configure per deployment
 lookback_days: 3
 
 matching:
