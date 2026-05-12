@@ -809,7 +809,6 @@ class SovereignOS:
 
         rounds = 0
         passed = False
-        details = {}
 
         while rounds < self.spine.policy["max_repair_rounds_per_test"]:
             rounds += 1
