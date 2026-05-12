@@ -8,7 +8,7 @@ title: SB689 OMEGA · Sovereign Stitch
 
 [![status](https://img.shields.io/badge/status-SB689__READY-gold)](WHITEPAPER)
 [![version](https://img.shields.io/badge/version-1.1.1-black)](../CHANGELOG)
-[![license](https://img.shields.io/badge/license-source--available%20%2F%20commercial-black)](../LICENSE)
+[![license](https://img.shields.io/badge/license-MIT-black)](../LICENSE.md)
 
 > *Sb688 — when I say connect to the stitch, show how you feel. We're going live. Let's sell it.*
 
@@ -78,5 +78,5 @@ npm run demo
 
 ---
 
-© 2026 John Arenz (J.G.A.). All rights reserved.  
+© 2026 John Arenz (J.G.A.). MIT licensed.  
 [jgaos2026-gif.com](https://www.jgaos2026-gif.com)

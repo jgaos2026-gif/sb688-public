@@ -1,0 +1,56 @@
+name: triple-check
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-three-sources:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate three-source public alignment
+        run: |
+          python - <<'PY'
+          import pathlib
+          import sys
+
+          required = {
+              "README.md": [
+                  "system status",
+                  "triple braid",
+                  "spine proxy",
+                  "stitch_bridge.md",
+              ],
+              "STITCH_BRIDGE.md": [
+                  "outermost",
+                  "wall brick",
+                  "triple braid",
+                  "lifecycle",
+              ],
+              "CONSTITUTION.md": [
+                  "perinatal brick immunity",
+                  "triple braid",
+                  "spine proxy",
+              ],
+          }
+
+          missing = []
+          for path, phrases in required.items():
+              text = pathlib.Path(path).read_text(encoding="utf-8").lower()
+              for phrase in phrases:
+                  if phrase not in text:
+                      missing.append(f"{path} missing phrase: {phrase}")
+
+          if missing:
+              print("Triple-check failed:")
+              for item in missing:
+                  print(f" - {item}")
+              sys.exit(1)
+
+          print("Triple-check passed across README.md, STITCH_BRIDGE.md, and CONSTITUTION.md.")
+          PY

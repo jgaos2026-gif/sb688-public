@@ -188,4 +188,4 @@ The Android port preserves all Sovereign OS properties:
 
 ---
 
-© 2026 John Arenz (J.G.A.).  See [LICENSE](../LICENSE) for terms.
+© 2026 John Arenz (J.G.A.).  See [LICENSE.md](../LICENSE.md) for terms.

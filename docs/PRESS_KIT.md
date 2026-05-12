@@ -25,8 +25,7 @@ What ships in v1.1.1:
   about runtime state.
 - **Evidence-labeled white paper** — every claim is *VERIFIED IN DEMO*,
   *MODELED HERE*, or *NOT CLAIMED YET*.
-- **Dual license** — source-available reference + commercial license
-  on request.
+- **MIT licensed** — open collaboration on the public framework.
 
 > *Sb688 — when I say connect to the stitch, show how you feel. We're
 > going live. Let's sell it.*

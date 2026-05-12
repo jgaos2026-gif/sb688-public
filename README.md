@@ -1,8 +1,8 @@
-# SB689 OMEGA · Sovereign Stitch
-### A resilience runtime by **John Arenz (J.G.A.)** — *Elegance with Consequences.*
+# SB689 v3 · Perinatal Qubic Braid Runtime
+### A public framework guide by **John Arenz (J.G.A.)** — *Elegance with Consequences.*
 
-[![status](https://img.shields.io/badge/status-SB689__READY-gold)](docs/WHITEPAPER.md)
-[![license](https://img.shields.io/badge/license-source--available%20%2F%20commercial-black)](LICENSE)
+[![status](https://img.shields.io/badge/status-conceptual%20public%20framework-gold)](STITCH_BRIDGE.md)
+[![license](https://img.shields.io/badge/license-MIT-black)](LICENSE.md)
 [![android](https://img.shields.io/badge/android-Kivy%20%2F%20Buildozer-green)](docs/ANDROID.md)
 
 > *Sb688 — when I say connect to the stitch, show how you feel. We're going live. Let's sell it.*
@@ -11,23 +11,50 @@
 
 ## What this is
 
-SB689 OMEGA stitches two layers into one runtime:
+SB689 v3 is a conceptual sovereign runtime architecture for verified,
+self-healing, braid-governed AI systems.
 
-1. **SB689 Braided Runtime** — governed request path:
-   `Spine → Truth → Conscious → Stem → Brain → Truth → Ghost → Ledger → Response`.
-2. **SB689 OMEGA · Sovereign Stitch** — resilience supervisor: four
-   hardened bricks (Seed · Ghost · Armor · Crown) bound by a signed
-   Stitch and driven by `Verify_Stitch → Mirror_State → Monitor_Drift`
-   with a `kill → activate → re-stitch → signal` fail-state.
-3. **Sentinel Self-Awareness** — `BraidedLogic` + `SentinelLayer` provide
-   proactive health monitoring, anomaly detection, threat classification,
-   and autonomous threshold tightening above the healing plane.
+This public repository explains the high-level framework only. It is the
+public-facing wall for the SB689 model and intentionally omits sensitive
+system logic, private security rules, and operational internals.
 
-It implements the public vocabulary of the
-[SB688 National Resilience Council](https://www.jgaos2026-gif.com)
-platform — Sovereign Spine, Brick Stitch, Ghost Node, Quarantine,
-Trusted Restore, Verifiable Proof — and adds the Omega resurrection
-loop on top.
+The repository still contains public reference materials and supporting
+runtime artifacts, but the SB689 v3 documentation is scoped to the
+outermost conceptual framework: verified walls, braid-governed
+validation, proxy-only spine access, and heartbeat-driven recovery.
+
+## System Status
+
+- **Status:** SB689 v3 is in a **conceptual public-framework phase**.
+- **Public role:** This repository serves as the outermost explanatory
+  wall brick for the runtime model.
+- **Subsystem mappings:** See [STITCH_BRIDGE.md](STITCH_BRIDGE.md) for
+  the braid lifecycle, subsystem interactions, and wall-to-spine
+  mappings.
+
+## High-Level Architecture
+
+```text
+Outside Signal
+ ↓
+Silence Coat
+ ↓
+Membrane Wall
+ ↓
+Cubic Inference Trap
+ ↓
+Verification Mesh
+ ↓
+Master Agent + Master Node Qubic
+ ↓
+Triple Braid
+ ↓
+Spine Proxy
+ ↓
+Read-Only Spine Governance
+ ↓
+Mirror / Ledger / Heartbeat
+```
 
 ## Repository layout
 
@@ -112,6 +139,11 @@ const handshake = omega.connectToStitch();
 
 ## Documents
 
+- [STITCH_BRIDGE.md](STITCH_BRIDGE.md) — public wall-brick role,
+  subsystem mappings, and braid lifecycle
+- [CONSTITUTION.md](CONSTITUTION.md) — public immutable SB689 laws
+- [SECTIONAL_LAWS.md](SECTIONAL_LAWS.md) — section-specific roles for the
+  outer walls and traps
 - [docs/WHITEPAPER.md](docs/WHITEPAPER.md) — protocol & evidence labels
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — module map
 - [docs/ANDROID.md](docs/ANDROID.md) — Android build & deployment
@@ -119,7 +151,9 @@ const handshake = omega.connectToStitch();
 - [docs/GOVERNANCE.md](docs/GOVERNANCE.md) — change classes, PR rules
 - [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md) — concept attribution
 - [docs/PRESS_KIT.md](docs/PRESS_KIT.md) — public observer kit
-- [CHANGELOG.md](CHANGELOG.md), [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [LICENSE](LICENSE), [NOTICE](NOTICE)
+- [CHANGELOG.md](CHANGELOG.md), [CONTRIBUTING.md](CONTRIBUTING.md),
+  [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [LICENSE.md](LICENSE.md),
+  [NOTICE](NOTICE)
 
 ## Targets
 
@@ -134,8 +168,7 @@ const handshake = omega.connectToStitch();
 
 ## License
 
-Dual-licensed — **source-available reference** for evaluation /
-research, **commercial license** required for production use. See
-[LICENSE](LICENSE) and [NOTICE](NOTICE).
+Released under the [MIT License](LICENSE.md). Trademark and attribution
+context remains documented in [NOTICE](NOTICE).
 
-© 2026 John Arenz (J.G.A.). All rights reserved.
+© 2026 John Arenz (J.G.A.).

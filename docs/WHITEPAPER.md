@@ -173,4 +173,4 @@ replacement for proper infrastructure engineering. It demonstrates
 defensive containment and recoverability — it does not claim perfect
 security.
 
-© 2026 John Arenz (J.G.A.). All rights reserved.
+© 2026 John Arenz (J.G.A.). Released under the MIT License.
