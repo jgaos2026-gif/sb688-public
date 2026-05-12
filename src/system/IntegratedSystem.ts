@@ -4,12 +4,14 @@ import { AuditLedger } from "../ledger/AuditLedger";
 import { OmegaSupervisor } from "../omega/OmegaSupervisor";
 import type { OmegaStatus } from "../omega/contracts";
 import { BraidedRuntime } from "../runtime/BraidedRuntime";
+import { FileUploadManager } from "../upload/FileUploadManager";
 
 export interface IntegratedSystemDeps {
   readonly ledger?: AuditLedger;
   readonly runtime?: BraidedRuntime;
   readonly omega?: OmegaSupervisor;
   readonly seedState?: Readonly<Record<string, unknown>>;
+  readonly uploadManager?: FileUploadManager;
 }
 
 export interface SystemMonitorInput {
@@ -34,6 +36,7 @@ export class IntegratedSystem {
   private readonly runtime: BraidedRuntime;
   private readonly omega: OmegaSupervisor;
   private readonly seedState: Readonly<Record<string, unknown>>;
+  readonly uploadManager: FileUploadManager;
 
   constructor(deps: IntegratedSystemDeps = {}) {
     this.ledger = deps.ledger ?? new AuditLedger();
@@ -43,6 +46,7 @@ export class IntegratedSystem {
       ledger: this.ledger,
       seedState: this.seedState
     });
+    this.uploadManager = deps.uploadManager ?? new FileUploadManager(this.ledger);
   }
 
   async process(intent: UserIntent, monitor: SystemMonitorInput = {}): Promise<SystemProcessResult> {

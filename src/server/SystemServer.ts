@@ -186,14 +186,86 @@ async function routeRequest(
     return;
   }
 
+  const UPLOAD_MAX_BODY_BYTES = 11 * 1024 * 1024; // 10 MB content + overhead
+
+  if (method === "POST" && url === "/api/upload") {
+    const body = await readJsonBodyWithLimit(request, UPLOAD_MAX_BODY_BYTES);
+    if (body === null) {
+      sendJson(response, 413, { ok: false, error: "Request body too large." });
+      return;
+    }
+    const filename = typeof body.filename === "string" ? body.filename.trim() : "";
+    const content = typeof body.content === "string" ? body.content : "";
+    const contentType =
+      typeof body.contentType === "string" ? body.contentType : "application/octet-stream";
+
+    if (filename.length === 0) {
+      sendJson(response, 400, {
+        ok: false,
+        error: "Field 'filename' is required for /api/upload"
+      });
+      return;
+    }
+
+    const result = system.uploadManager.receive({ filename, content, contentType });
+    sendJson(response, result.accepted ? 200 : 422, { ok: result.accepted, result });
+    return;
+  }
+
+  if (method === "POST" && url === "/api/upload/dispatch") {
+    const body = await readJsonBodyWithLimit(request, UPLOAD_MAX_BODY_BYTES);
+    if (body === null) {
+      sendJson(response, 413, { ok: false, error: "Request body too large." });
+      return;
+    }
+    const filename = typeof body.filename === "string" ? body.filename.trim() : "";
+    const destination = typeof body.destination === "string" ? body.destination.trim() : "";
+
+    if (filename.length === 0 || destination.length === 0) {
+      sendJson(response, 400, {
+        ok: false,
+        error: "Fields 'filename' and 'destination' are required for /api/upload/dispatch"
+      });
+      return;
+    }
+
+    const result = system.uploadManager.dispatch({ filename, destination });
+    sendJson(response, result.dispatched ? 200 : 422, { ok: result.dispatched, result });
+    return;
+  }
+
+  if (method === "GET" && url === "/api/upload/log") {
+    sendJson(response, 200, {
+      ok: true,
+      logValid: system.uploadManager.verifyUploadLog(),
+      entries: system.uploadManager.uploadLog()
+    });
+    return;
+  }
+
   sendJson(response, 404, { ok: false, error: "Not found" });
 }
 
 async function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>> {
+  return (await readJsonBodyWithLimit(request)) ?? {};
+}
+
+async function readJsonBodyWithLimit(
+  request: IncomingMessage,
+  maxBytes?: number
+): Promise<Record<string, unknown> | null> {
   const chunks: Buffer[] = [];
+  let totalBytes = 0;
 
   for await (const chunk of request) {
-    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    if (maxBytes !== undefined) {
+      totalBytes += buf.byteLength;
+      if (totalBytes > maxBytes) {
+        return null;
+      }
+    }
+    chunks.push(buf);
   }
 
   if (chunks.length === 0) {
