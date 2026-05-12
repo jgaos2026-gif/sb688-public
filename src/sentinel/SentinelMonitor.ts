@@ -231,7 +231,7 @@ export class SentinelMonitor {
   /** Remove resurrection entries outside the rolling window. */
   private pruneWindow(): void {
     const cutoff = this.sentinelCycle - SentinelMonitor.WINDOW;
-    while (this.resurrectionCycles.length > 0 && this.resurrectionCycles[0] <= cutoff) {
+    while (this.resurrectionCycles.length > 0 && this.resurrectionCycles[0] < cutoff) {
       this.resurrectionCycles.shift();
     }
   }

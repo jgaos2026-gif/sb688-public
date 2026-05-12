@@ -772,8 +772,8 @@ class SovereignOS:
         streak = 0
         for run in range(1, consecutive_passes + 1):
             print(f"\n--- EXTREME QUALIFICATION RUN #{run} ---")
-            fresh = SovereignOS()
-            passed = fresh.run_all_tests_with_extreme(verbose=True, extreme_months=months)
+            qualification_system = SovereignOS()
+            passed = qualification_system.run_all_tests_with_extreme(verbose=True, extreme_months=months)
             if not passed:
                 print(f"Extreme qualification run #{run}: FAIL")
                 return False
@@ -794,8 +794,8 @@ class SovereignOS:
         streak = 0
         for run in range(1, 4):
             print(f"\n--- TEST RUN #{run} ---")
-            fresh = SovereignOS()
-            passed = fresh.run_all_tests_once(verbose=True)
+            test_system = SovereignOS()
+            passed = test_system.run_all_tests_once(verbose=True)
             if not passed:
                 print(f"Run #{run}: FAIL")
                 return False
