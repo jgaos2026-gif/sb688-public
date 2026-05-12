@@ -105,6 +105,57 @@ export interface OmegaTargets {
   readonly failureTolerance: "zero";
 }
 
+// ── Sentinel self-awareness contracts (omega-layer) ──────────────────────────
+
+/**
+ * A single health observation recorded by the omega sentinel per supervisor tick.
+ * The `prevHash` field links each record to its predecessor for tamper evidence.
+ */
+export interface OmegaSentinelHealthMetric {
+  readonly tick: number;
+  readonly at: string;
+  readonly drift: number;
+  readonly breach: boolean;
+  readonly pulseAlive: boolean;
+  /** Hash of the preceding metric (or "SENTINEL_GENESIS" for the first). */
+  readonly prevHash: string;
+}
+
+/**
+ * Graduated adaptive recommendation produced by the omega sentinel after
+ * analysing its sliding observation window.
+ */
+export type OmegaSentinelRecommendation =
+  | "NOMINAL"
+  | "MONITOR"
+  | "ESCALATE"
+  | "QUARANTINE"
+  | "FAILSAFE";
+
+/** Diagnosis produced by the omega sentinel over its current sliding window. */
+export interface OmegaSentinelDiagnosis {
+  readonly windowSize: number;
+  readonly breachCount: number;
+  /** Ratio of breached ticks in the window, in [0, 1]. */
+  readonly breachRate: number;
+  readonly consecutiveBreaches: number;
+  readonly recommendation: OmegaSentinelRecommendation;
+  readonly reason: string;
+  /** True when the internal metric hash-chain has not been tampered with. */
+  readonly selfIntegrityOk: boolean;
+}
+
+/** Full omega sentinel status snapshot exposed through OmegaStatus. */
+export interface OmegaSentinelStatus {
+  readonly active: boolean;
+  readonly metricsRecorded: number;
+  readonly lastDiagnosis: OmegaSentinelDiagnosis;
+  /** FNV-1a hash of the entire metric chain for external tamper verification. */
+  readonly integrityHash: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface OmegaStatus {
   readonly status: "SB689_READY" | "SB689_RESURRECTING" | "SB689_BREACH";
   readonly cycle: number;
@@ -113,4 +164,5 @@ export interface OmegaStatus {
   readonly lastResurrection?: ResurrectionEvent;
   readonly stitch: StitchManifest;
   readonly targets: OmegaTargets;
+  readonly sentinel: OmegaSentinelStatus;
 }
