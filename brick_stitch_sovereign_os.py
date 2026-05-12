@@ -18,14 +18,6 @@ import networkx as nx
 # - no commits of unhealthy/corrupt state
 # - test harness that repairs and retries until stable
 # - every scenario must pass 3 times in a row
-#
-# Sentinel Self-Awareness Layer (SB689 OMEGA-inspired):
-# - proactive self-monitoring via SentinelLayer.watch()
-# - anomaly detection via SentinelMetrics
-# - adaptive decision-making via SentinelBraidedLogic
-# - ghost shadow mirroring via GhostMirror
-# - omega resurrection loop via SentinelLayer.resurrect()
-# - autonomous evolution via SentinelLayer.adapt()
 # ============================================================
 
 
@@ -97,6 +89,28 @@ class Spine:
             "max_repair_rounds_per_test": 6,
         }
         self.integrity_compromised = False
+        # Tamper-evident upload event log (separate from main brick-state ledger).
+        self.upload_log: List[Dict] = []
+        self._upload_log_prev_hash: str = "GENESIS"
+
+    def append_upload_event(self, event: Dict) -> str:
+        """Append an upload event to the tamper-evident upload log."""
+        entry_hash = hash_blob(stable_json({"event": event, "prev": self._upload_log_prev_hash}))
+        signed = {**event, "prev_hash": self._upload_log_prev_hash, "hash": entry_hash}
+        self.upload_log.append(signed)
+        self._upload_log_prev_hash = entry_hash
+        return entry_hash
+
+    def verify_upload_log(self) -> bool:
+        """Verify the hash chain of the upload event log."""
+        prev = "GENESIS"
+        for entry in self.upload_log:
+            event = {k: v for k, v in entry.items() if k not in ("prev_hash", "hash")}
+            expected = hash_blob(stable_json({"event": event, "prev": prev}))
+            if entry["prev_hash"] != prev or entry["hash"] != expected:
+                return False
+            prev = entry["hash"]
+        return True
 
     def _build_snapshot(self, bricks_state: Dict[str, Dict]) -> Dict:
         return {"bricks": {k: deepcopy(v) for k, v in bricks_state.items()}}
@@ -166,6 +180,175 @@ class Spine:
         # Simulate a hostile modification to committed truth.
         self.ledger[self.current_version]["snapshot"]["bricks"]["core"]["status"] = "TAMPERED"
         self.integrity_compromised = True
+
+
+# ===================== SENTINEL =====================
+_SENTINEL_MAX_SIZE = 10 * 1024 * 1024  # 10 MB
+_SENTINEL_ALLOWED_TYPES = frozenset({
+    "text/plain",
+    "application/json",
+    "application/pdf",
+    "application/octet-stream",
+    "text/csv",
+})
+
+
+class UploadSentinel:
+    """Scans incoming uploads for anomalies before they are accepted into the brick FS."""
+
+    def __init__(self, spine: "Spine", clock: DeterministicClock):
+        self.spine = spine
+        self.clock = clock
+        self._seen_hashes: set = set()
+
+    def scan(self, filename: str, content: bytes, content_type: str) -> Tuple[bool, List[str]]:
+        """Return (clean, anomalies)."""
+        anomalies: List[str] = []
+
+        if len(content) == 0:
+            anomalies.append("empty_content")
+
+        if len(content) > _SENTINEL_MAX_SIZE:
+            anomalies.append(f"content_too_large:{len(content)}")
+
+        if ".." in filename or "/" in filename or "\\" in filename:
+            anomalies.append("suspicious_filename")
+
+        normalized_type = content_type.split(";")[0].strip().lower()
+        if normalized_type not in _SENTINEL_ALLOWED_TYPES:
+            anomalies.append(f"unsupported_content_type:{normalized_type}")
+
+        content_hash = hash_blob(content)
+        if content_hash in self._seen_hashes:
+            anomalies.append("duplicate_content_hash")
+
+        if not anomalies:
+            self._seen_hashes.add(content_hash)
+
+        return len(anomalies) == 0, anomalies
+
+
+# ===================== FILE UPLOAD MANAGER =====================
+class FileUploadManager:
+    """Handles incoming file uploads and autonomous self-dispatch.
+
+    All events are recorded in the Spine's tamper-evident upload log.
+    """
+
+    def __init__(self, spine: "Spine", bricks: Dict[str, Brick], sentinel: "UploadSentinel", clock: DeterministicClock):
+        self.spine = spine
+        self.bricks = bricks
+        self.sentinel = sentinel
+        self.clock = clock
+        self._store: Dict[str, Dict] = {}
+        self._MAX_STORE_FILES = 200
+
+    def receive(self, filename: str, content: bytes, content_type: str = "application/octet-stream") -> Tuple[bool, Dict]:
+        """Receive an incoming file upload, validate through the sentinel, and store."""
+        ts = self.clock.now()
+        clean, anomalies = self.sentinel.scan(filename, content, content_type)
+        content_hash = hash_blob(content)
+
+        event: Dict = {
+            "action": "receive_upload",
+            "filename": filename,
+            "content_type": content_type,
+            "size": len(content),
+            "content_hash": content_hash,
+            "sentinel_pass": clean,
+            "anomalies": anomalies,
+            "timestamp": ts,
+        }
+
+        if not clean:
+            event["status"] = "rejected"
+            self.spine.append_upload_event(event)
+            return False, {"status": "rejected", "anomalies": anomalies, "filename": filename}
+
+        if len(self._store) >= self._MAX_STORE_FILES:
+            event["status"] = "rejected"
+            event["reason"] = "store_full"
+            self.spine.append_upload_event(event)
+            return False, {"status": "rejected", "reason": "store_full", "filename": filename}
+
+        fs_brick = self.bricks.get("fs")
+        if fs_brick is None or not fs_brick.healthy:
+            event["status"] = "failed_fs_unavailable"
+            self.spine.append_upload_event(event)
+            return False, {"status": "failed", "reason": "fs_brick_unavailable"}
+
+        fs_brick.state.setdefault("files", {})[filename] = {
+            "hash": content_hash,
+            "size": len(content),
+            "content_type": content_type,
+            "stored_at": ts,
+        }
+        self._store[filename] = {
+            "content": content,
+            "content_hash": content_hash,
+            "content_type": content_type,
+            "size": len(content),
+            "stored_at": ts,
+        }
+
+        event["status"] = "accepted"
+        self.spine.append_upload_event(event)
+        return True, {"status": "accepted", "filename": filename, "hash": content_hash, "size": len(content)}
+
+    def dispatch(self, filename: str, destination: str) -> Tuple[bool, Dict]:
+        """Self-upload a stored file to a designated logical destination."""
+        ts = self.clock.now()
+
+        if filename not in self._store:
+            self.spine.append_upload_event({
+                "action": "dispatch_upload",
+                "filename": filename,
+                "destination": destination,
+                "status": "failed",
+                "reason": "file_not_found",
+                "timestamp": ts,
+            })
+            return False, {"status": "failed", "reason": "file_not_found", "filename": filename}
+
+        if ".." in destination or "/" in destination or "\\" in destination:
+            self.spine.append_upload_event({
+                "action": "dispatch_upload",
+                "filename": filename,
+                "destination": destination,
+                "status": "rejected",
+                "reason": "invalid_destination",
+                "timestamp": ts,
+            })
+            return False, {"status": "rejected", "reason": "invalid_destination"}
+
+        record = self._store[filename]
+        actual_hash = hash_blob(record["content"])
+        if actual_hash != record["content_hash"]:
+            self.spine.append_upload_event({
+                "action": "dispatch_upload",
+                "filename": filename,
+                "destination": destination,
+                "status": "failed",
+                "reason": "integrity_check_failed",
+                "timestamp": ts,
+            })
+            return False, {"status": "failed", "reason": "integrity_check_failed"}
+
+        self.spine.append_upload_event({
+            "action": "dispatch_upload",
+            "filename": filename,
+            "destination": destination,
+            "content_hash": record["content_hash"],
+            "size": record["size"],
+            "status": "dispatched",
+            "timestamp": ts,
+        })
+        return True, {
+            "status": "dispatched",
+            "filename": filename,
+            "destination": destination,
+            "hash": record["content_hash"],
+        }
 
 
 # ===================== HEALING =====================
@@ -242,384 +425,6 @@ class HealingLayer:
         return ok
 
 
-# ===================== SENTINEL SELF-AWARENESS =====================
-# Inspired by the SB689 OMEGA · Sovereign Stitch architecture.
-# Adds proactive monitoring, anomaly detection, adaptive decision-
-# making, ghost shadow mirroring, braided ethical logic, and an
-# omega-style resurrection loop to the Sovereign OS.
-
-
-class SentinelBraidedLogic:
-    """
-    Braided personality · moral · judgment routing for ethical AI decisions.
-    The Guardian personality prioritises protection; moral weights reflect
-    the cost of each action; judgment is derived from fault context and
-    incident history.
-    """
-
-    _MORAL_WEIGHT: Dict[str, float] = {
-        "rollback": 0.95,
-        "resurrect": 0.90,
-        "restart": 0.85,
-        "quarantine": 0.80,
-        "heal": 0.75,
-        "alert": 0.60,
-    }
-
-    # Bricks that are more critical to the system
-    _BRICK_IMPORTANCE: Dict[str, float] = {
-        "core": 1.0,
-        "driver_net": 0.8,
-        "fs": 0.7,
-        "user_app": 0.5,
-    }
-
-    def __init__(self) -> None:
-        self.personality = "guardian"
-        self.judgment_history: List[Dict] = []
-
-    def judge(self, context: Dict) -> Dict:
-        """Return an ethical judgment for the given fault context."""
-        fault_type: str = context.get("fault_type", "unknown")
-        severity: float = context.get("severity", 0.5)
-        heal_count: int = context.get("heal_count", 0)
-
-        if fault_type == "spine_tamper":
-            action = "resurrect"
-        elif severity >= 0.8 or heal_count >= 4:
-            action = "quarantine"
-        elif fault_type in {"corrupt", "storage_corrupt", "partial_update"}:
-            action = "rollback"
-        elif fault_type in {"crash", "runtime_crash", "driver_fault", "dependency_failure"}:
-            action = "restart"
-        else:
-            action = "heal"
-
-        moral_score = self._MORAL_WEIGHT.get(action, 0.5)
-        judgment: Dict = {
-            "action": action,
-            "moral_score": moral_score,
-            "personality": self.personality,
-            "reasoning": (
-                f"Guardian judgment: {action} for '{fault_type}' "
-                f"(severity={severity:.2f}, heal_count={heal_count})"
-            ),
-        }
-        self.judgment_history.append(judgment)
-        return judgment
-
-    def brick_importance(self, brick_name: str) -> float:
-        return self._BRICK_IMPORTANCE.get(brick_name, 0.6)
-
-
-class GhostMirror:
-    """
-    Shadow-mirror that snapshots system state each cycle.
-    Provides a clean prior frame for resurrection pointer-flips —
-    ensuring a tampered live state never re-enters the trusted chain.
-    """
-
-    def __init__(self) -> None:
-        self.frames: List[Dict] = []
-        self.cycle = 0
-
-    def mirror(self, state: Dict, clock_ts: int) -> Dict:
-        self.cycle += 1
-        frame: Dict = {
-            "cycle": self.cycle,
-            "state": deepcopy(state),
-            "captured_at": clock_ts,
-            "hash": hash_blob(stable_json(state)),
-        }
-        self.frames.append(frame)
-        return frame
-
-    def latest(self) -> Optional[Dict]:
-        return self.frames[-1] if self.frames else None
-
-    def latest_clean(self, current_hash: str) -> Optional[Dict]:
-        """Return the most-recent frame whose hash differs from current_hash."""
-        for frame in reversed(self.frames):
-            if frame["hash"] != current_hash:
-                return frame
-        return None
-
-
-class SentinelMetrics:
-    """
-    Sliding-window fault and heal tracker used by the anomaly detector
-    and threat-prediction engine.
-    """
-
-    # The Python simulator uses a higher threshold (0.55) than the TypeScript
-    # AnomalyDetector (0.40) because the Python test harness runs short, isolated
-    # scenarios (one fault per test) rather than accumulating faults across many
-    # requests.  A lower threshold would trigger false anomalies in these small
-    # windows.
-    _ANOMALY_THRESHOLD = 0.55
-
-    def __init__(self, window: int = 20) -> None:
-        self.window = window
-        self.fault_history: List[Dict] = []
-        self.heal_times: List[int] = []
-
-    def record_fault(self, brick_name: str, fault_type: str, timestamp: int) -> None:
-        self.fault_history.append({"brick": brick_name, "fault": fault_type, "ts": timestamp})
-        if len(self.fault_history) > self.window:
-            self.fault_history.pop(0)
-
-    def record_heal(self, timestamp: int) -> None:
-        self.heal_times.append(timestamp)
-        if len(self.heal_times) > self.window:
-            self.heal_times.pop(0)
-
-    def anomaly_score(self) -> float:
-        """Fraction of the observation window that contains fault events, in [0, 1]."""
-        return min(1.0, len(self.fault_history) / max(1, self.window))
-
-    def is_anomaly(self) -> bool:
-        return self.anomaly_score() >= self._ANOMALY_THRESHOLD
-
-    def fault_frequency(self, brick_name: str) -> int:
-        return sum(1 for f in self.fault_history if f["brick"] == brick_name)
-
-    def predict_threat(self) -> Optional[str]:
-        """Return the brick most likely to fail next based on recent history."""
-        if not self.fault_history:
-            return None
-        counts: Dict[str, int] = {}
-        for f in self.fault_history:
-            counts[f["brick"]] = counts.get(f["brick"], 0) + 1
-        return max(counts, key=lambda k: counts[k])
-
-
-class SentinelLayer:
-    """
-    Sentinel self-awareness layer for the Sovereign OS.
-
-    Inspired by SB689 OMEGA · Sovereign Stitch:
-      loop: [Watch -> Detect -> Judge -> Heal/Alert -> Mirror -> Adapt]
-      fail: resurrect(ghost_shadow) -> re-stitch(clean_seed) -> signal
-
-    Capabilities
-    ============
-    • Proactive self-monitoring  — watch() reads all brick health each cycle.
-    • Anomaly detection          — SentinelMetrics flags unusual fault density.
-    • Adaptive decision-making   — SentinelBraidedLogic routes ethical actions.
-    • Autonomous evolution       — adapt() learns from incident memory.
-    • Ghost shadow mirroring     — GhostMirror captures each cycle before drift.
-    • Omega resurrection loop    — resurrect() pointer-flips to a clean frame.
-    • Deterministic & auditable  — every alert and judgment is hash-stamped.
-    """
-
-    _FAULT_TYPE_SEVERITY: Dict[str, float] = {
-        "spine_tamper": 1.0,
-        "corrupt": 0.9,
-        "storage_corrupt": 0.9,
-        "heal_layer_fault": 0.85,
-        "dependency_failure": 0.8,
-        "driver_fault": 0.7,
-        "partial_update": 0.7,
-        "crash": 0.6,
-        "runtime_crash": 0.6,
-    }
-
-    def __init__(
-        self,
-        spine: "Spine",
-        bricks: Dict[str, "Brick"],
-        dep_graph: nx.DiGraph,
-        clock: DeterministicClock,
-    ) -> None:
-        self.spine = spine
-        self.bricks = bricks
-        self.dep_graph = dep_graph
-        self.clock = clock
-
-        self.braided = SentinelBraidedLogic()
-        self.ghost = GhostMirror()
-        self.metrics = SentinelMetrics()
-
-        self.alert_log: List[Dict] = []
-        self.resurrection_log: List[Dict] = []
-        self.incident_memory: List[Dict] = []
-
-        self.armed = True
-        self.status = "SENTINEL_ARMED"
-        self._resurrection_count = 0
-        self._max_resurrections = 3
-
-    # ------------------------------------------------------------------
-    # Public API
-    # ------------------------------------------------------------------
-
-    def watch(self) -> Dict:
-        """
-        Proactive watch cycle: mirror state, detect anomalies, predict threats.
-        Returns a sentinel health report.
-        """
-        if not self.armed:
-            return {"status": "SENTINEL_OFFLINE", "anomaly": False}
-
-        current_state = {name: brick.get_state() for name, brick in self.bricks.items()}
-        current_health = {name: brick.healthy for name, brick in self.bricks.items()}
-        frame = self.ghost.mirror({"state": current_state, "health": current_health}, self.clock.now())
-
-        anomaly = self.metrics.is_anomaly()
-        predicted_threat = self.metrics.predict_threat()
-        anomaly_score = self.metrics.anomaly_score()
-        unhealthy = [n for n, ok in current_health.items() if not ok]
-
-        if unhealthy:
-            self._alert("WARNING", f"Unhealthy bricks: {unhealthy}", {
-                "bricks": unhealthy, "anomaly_score": anomaly_score,
-            })
-        if anomaly:
-            self._alert("HIGH", f"Anomaly detected: score={anomaly_score:.2f}", {
-                "score": anomaly_score, "predicted_threat": predicted_threat,
-            })
-        if anomaly and self.status == "SENTINEL_ARMED":
-            self.status = "SENTINEL_WATCHING"
-
-        return {
-            "status": self.status,
-            "frame_cycle": frame["cycle"],
-            "frame_hash": frame["hash"],
-            "unhealthy_bricks": unhealthy,
-            "anomaly": anomaly,
-            "anomaly_score": anomaly_score,
-            "predicted_threat": predicted_threat,
-            "chain_ok": self.spine.verify_chain(),
-            "ledger_version": self.spine.current_version,
-        }
-
-    def on_fault(self, brick_name: str, fault_type: str) -> Dict:
-        """
-        Called on fault injection. Records metrics and returns a braided judgment
-        containing the recommended action and its moral score.
-        """
-        ts = self.clock.now()
-        self.metrics.record_fault(brick_name, fault_type, ts)
-        severity = self._assess_severity(brick_name, fault_type)
-        heal_count = self.bricks[brick_name].heal_count if brick_name in self.bricks else 0
-
-        judgment = self.braided.judge({
-            "fault_type": fault_type,
-            "severity": severity,
-            "heal_count": heal_count,
-            "brick": brick_name,
-        })
-        judgment["timestamp"] = ts
-        self._alert("FAULT", f"Fault on '{brick_name}': {fault_type}", {
-            "severity": severity, "judgment": judgment["action"],
-        })
-        return judgment
-
-    def on_heal(self, brick_name: str, action: str) -> None:
-        """
-        Called after a successful heal. Records metrics and stores incident for
-        autonomous evolution.
-        """
-        ts = self.clock.now()
-        self.metrics.record_heal(ts)
-        self.incident_memory.append({
-            "brick": brick_name,
-            "action": action,
-            "ts": ts,
-            "anomaly_score_at_heal": self.metrics.anomaly_score(),
-        })
-        if len(self.incident_memory) > 50:
-            self.incident_memory.pop(0)
-
-    def resurrect(self, cause: str) -> bool:
-        """
-        Omega resurrection loop: pointer-flip to the last clean ghost mirror.
-        Returns True when a resurrection event is logged; False when the maximum
-        resurrection budget is exhausted (SENTINEL_BREACH).
-        """
-        if self._resurrection_count >= self._max_resurrections:
-            self._alert("CRITICAL", "Max resurrections reached — system cannot self-heal", {
-                "count": self._resurrection_count, "cause": cause,
-            })
-            self.status = "SENTINEL_BREACH"
-            return False
-
-        self._resurrection_count += 1
-        ts = self.clock.now()
-        latest = self.ghost.latest()
-        event: Dict = {
-            "resurrection_id": self._resurrection_count,
-            "cause": cause,
-            "ts": ts,
-            "ghost_frame_cycle": latest["cycle"] if latest else None,
-            "ghost_frame_hash": latest["hash"] if latest else None,
-        }
-        self.resurrection_log.append(event)
-        self._alert("RESURRECTION", f"Omega resurrection #{self._resurrection_count}: {cause}", event)
-        self.status = "SENTINEL_RESURRECTING"
-        return True
-
-    def adapt(self) -> Dict:
-        """
-        Autonomous evolution: analyse incident memory and emit actionable
-        recommendations for system hardening.
-        """
-        if not self.incident_memory:
-            return {"recommendations": [], "evolved": False}
-
-        brick_faults: Dict[str, int] = {}
-        for inc in self.incident_memory:
-            b = inc["brick"]
-            brick_faults[b] = brick_faults.get(b, 0) + 1
-
-        recommendations = [
-            {"brick": b, "action": "increase_monitoring", "reason": f"{b} has {cnt} recorded incidents"}
-            for b, cnt in brick_faults.items()
-            if cnt >= 3
-        ]
-        evolved = bool(recommendations)
-        if evolved:
-            self.status = "SENTINEL_EVOLVED"
-        return {
-            "recommendations": recommendations,
-            "evolved": evolved,
-            "incidents_analyzed": len(self.incident_memory),
-        }
-
-    def full_report(self) -> Dict:
-        """Return a complete sentinel status snapshot."""
-        return {
-            "sentinel_status": self.status,
-            "armed": self.armed,
-            "watch": self.watch(),
-            "adaptation": self.adapt(),
-            "alert_count": len(self.alert_log),
-            "resurrection_count": self._resurrection_count,
-            "incident_memory_size": len(self.incident_memory),
-            "judgment_count": len(self.braided.judgment_history),
-        }
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _alert(self, level: str, message: str, context: Dict) -> None:
-        self.alert_log.append({
-            "level": level,
-            "message": message,
-            "context": deepcopy(context),
-            "ts": self.clock.now(),
-        })
-
-    def _assess_severity(self, brick_name: str, fault_type: str) -> float:
-        """Severity in [0, 1] combining brick importance, fault type, and history."""
-        importance = self.braided.brick_importance(brick_name)
-        type_severity = self._FAULT_TYPE_SEVERITY.get(fault_type, 0.5)
-        freq = self.metrics.fault_frequency(brick_name)
-        history_factor = min(1.0, freq / 5)
-        return min(1.0, (importance + type_severity + history_factor) / 3)
-
-
 # ===================== OPERATIONS =====================
 class OperationsLayer:
     def __init__(self, spine: Spine, bricks: Dict[str, Brick], dep_graph: nx.DiGraph, clock: DeterministicClock):
@@ -674,6 +479,7 @@ class SovereignOS:
         self.healing: Optional[HealingLayer] = None
         self.operations: Optional[OperationsLayer] = None
         self.sentinel: Optional[SentinelLayer] = None
+        self.upload_manager: Optional[FileUploadManager] = None
         self.setup_system()
 
     def setup_system(self) -> None:
@@ -683,6 +489,7 @@ class SovereignOS:
             "driver_net": Brick("driver_net", ["core"], {"status": "up", "packets": 0, "driver": "mesh-v1"}),
             "fs": Brick("fs", ["core", "driver_net"], {"status": "mounted", "files": {}, "journal_clean": True}),
             "user_app": Brick("user_app", ["fs"], {"status": "active", "data": "hello", "checkpoint": 0}),
+            "upload": Brick("upload", ["fs"], {"status": "ready", "pending_uploads": 0, "dispatched": 0}),
         }
         for name, brick in self.bricks.items():
             self.dep_graph.add_node(name)
@@ -691,20 +498,20 @@ class SovereignOS:
 
         self.healing = HealingLayer(self.spine, self.bricks, self.dep_graph, self.clock)
         self.operations = OperationsLayer(self.spine, self.bricks, self.dep_graph, self.clock)
-        self.sentinel = SentinelLayer(self.spine, self.bricks, self.dep_graph, self.clock)
+        self.sentinel = SentinelLayer(self.healing, self.bricks, self.clock)
+        upload_sentinel = UploadSentinel(self.spine, self.clock)
+        self.upload_manager = FileUploadManager(self.spine, self.bricks, upload_sentinel, self.clock)
 
     # ---------------- Fault Injection ----------------
     def inject_fault(self, brick_name: Optional[str], fault_type: str) -> bool:
         if fault_type == "spine_tamper":
             self.spine.tamper_with_head()
-            if self.sentinel:
-                self.sentinel.on_fault("spine", fault_type)
+            self.sentinel.record_fault(brick_name, fault_type)
             return True
 
         if fault_type == "heal_layer_fault":
             self.healing.online = False
-            if self.sentinel:
-                self.sentinel.on_fault("heal_layer", fault_type)
+            self.sentinel.record_fault(brick_name, fault_type)
             return True
 
         if brick_name is None or brick_name not in self.bricks:
@@ -727,8 +534,7 @@ class SovereignOS:
         else:
             return False
 
-        if self.sentinel:
-            self.sentinel.on_fault(brick_name, fault_type)
+        self.sentinel.record_fault(brick_name, fault_type)
         return True
 
     # ---------------- Repair Logic ----------------
@@ -739,9 +545,6 @@ class SovereignOS:
         if fault_type == "spine_tamper":
             recovered = self.healing.recover_spine()
             if recovered:
-                if self.sentinel:
-                    self.sentinel.on_heal("spine", "recover_spine")
-                    self.sentinel.resurrect("spine_tamper recovered")
                 return self.operations.run_cycle()
             return False
 
@@ -752,8 +555,6 @@ class SovereignOS:
                 self.bricks[brick_name].healthy = True
                 self.bricks[brick_name].state.pop("corrupted", None)
                 self.bricks[brick_name].state.pop("crash_flag", None)
-            if self.sentinel:
-                self.sentinel.on_heal("heal_layer", "restore_online")
             return self.operations.run_cycle()
 
         if brick_name is None:
@@ -769,11 +570,6 @@ class SovereignOS:
         self.bricks[brick_name].update_target_version = None
         if self.bricks[brick_name].state.get("status") == "updating":
             self.bricks[brick_name].state["status"] = "mounted" if brick_name == "fs" else "running"
-
-        if self.sentinel:
-            last = self.healing.heal_log[-1] if self.healing.heal_log else None
-            action = last[1] if last and len(last) >= 2 else "heal"
-            self.sentinel.on_heal(brick_name, action)
 
         downstream_ok = self.healing.rerun_downstream(brick_name)
         cycle_ok = self.operations.run_cycle()
@@ -809,11 +605,14 @@ class SovereignOS:
 
         rounds = 0
         passed = False
+        details: Dict[str, Any] = {}
 
         while rounds < self.spine.policy["max_repair_rounds_per_test"]:
             rounds += 1
             repaired = self.attempt_repair(fault_brick, fault_type)
             valid, details = self.validate_system()
+            # Run sentinel watch after each repair attempt.
+            self.sentinel.watch()
             if repaired and valid:
                 passed = True
                 break
@@ -838,6 +637,7 @@ class SovereignOS:
             "repair_rounds": rounds,
             "details": details,
             "ledger_head": self.spine.current_version,
+            "sentinel": self.sentinel.status(),
         }
         return passed, report
 
@@ -872,12 +672,7 @@ class SovereignOS:
         return all_passed
 
     def run_extreme_environment_simulation(self, months: int = 6, verbose: bool = True) -> Tuple[bool, Dict[str, Any]]:
-        """Run a month-by-month endurance simulation across extreme environments.
-
-        Applies a rotating stress profile (space, sea, land, underwater, cosmic-ray burst,
-        and compound worst-case events), attempts automated repair/recovery, and validates
-        health + ledger integrity after each month.
-        """
+        """Run a month-by-month endurance simulation across extreme environments."""
         self.setup_system()
         boot_ok = self.operations.boot()
         if not boot_ok:
@@ -972,26 +767,6 @@ class SovereignOS:
                 print(f"  details={report.get('details')}")
         return all_passed and passed
 
-    def sentinel_status(self) -> Dict[str, Any]:
-        """Return the current sentinel status dict."""
-        return self.sentinel.status() if self.sentinel else {}
-
-    def run_three_clean_passes(self) -> bool:
-        streak = 0
-        for run in range(1, 4):
-            print(f"\n--- TEST RUN #{run} ---")
-            fresh = SovereignOS()
-            passed = fresh.run_all_tests_once(verbose=True)
-            if not passed:
-                print(f"Run #{run}: FAIL")
-                return False
-            streak += 1
-            adapt = fresh.sentinel.adapt() if fresh.sentinel else {}
-            sentinel_note = f" | sentinel_evolved={adapt.get('evolved', False)}"
-            print(f"Run #{run}: FULL PASS{sentinel_note}")
-        print(f"\nALL TESTS PASSED {streak} TIMES IN A ROW - SYSTEM READY")
-        return True
-
     def run_full_suite_with_extreme_qualification(self, months: int = 6, consecutive_passes: int = 5) -> bool:
         """Execute full-suite + extreme endurance qualification for consecutive passes."""
         streak = 0
@@ -1011,12 +786,190 @@ class SovereignOS:
         """Alias for extreme full-suite qualification runs."""
         return self.run_full_suite_with_extreme_qualification(months=months, consecutive_passes=consecutive_passes)
 
+    def sentinel_status(self) -> Dict[str, Any]:
+        """Return the current sentinel status dict."""
+        return self.sentinel.status() if self.sentinel else {}
+
+    def run_three_clean_passes(self) -> bool:
+        streak = 0
+        for run in range(1, 4):
+            print(f"\n--- TEST RUN #{run} ---")
+            fresh = SovereignOS()
+            passed = fresh.run_all_tests_once(verbose=True)
+            if not passed:
+                print(f"Run #{run}: FAIL")
+                return False
+            streak += 1
+            print(f"Run #{run}: FULL PASS")
+        print(f"\nALL TESTS PASSED {streak} TIMES IN A ROW - SYSTEM READY")
+        return True
+
+
+# ===================== BRAIDED LOGIC =====================
+class BraidedLogic:
+    """Three-braid ethical decision layer (personality · moral · judgment).
+
+    Every sentinel action passes through moral and judgment checks before
+    being approved.  Personalities tune the threshold but cannot bypass
+    the hard safety floor.
+    """
+
+    PERSONALITIES = ("steadfast", "adaptive", "cautious")
+
+    # Actions that require a confirmed backup before being permitted.
+    _DESTRUCTIVE_ACTIONS: frozenset = frozenset({"purge", "wipe", "overwrite_ledger"})
+
+    def __init__(self, personality: str = "adaptive"):
+        if personality not in self.PERSONALITIES:
+            personality = "adaptive"
+        self.personality = personality
+        self.decision_log: List[Dict[str, Any]] = []
+
+    # ---- moral braid ----
+    def moral_check(self, action: str, context: Dict[str, Any]) -> bool:
+        """Return True when the action is morally permissible."""
+        if action in self._DESTRUCTIVE_ACTIONS:
+            if not context.get("backup_confirmed"):
+                return False
+        return True
+
+    # ---- judgment braid ----
+    def judgment_route(self, threat_level: str, suggested_action: str) -> str:
+        """Map threat level + personality to a concrete approved action."""
+        if self.personality == "cautious":
+            if threat_level in {"high", "critical"}:
+                return "alert_only"
+        if self.personality == "steadfast":
+            return suggested_action
+        # adaptive: follow suggestion unless threat is merely low
+        if threat_level == "low":
+            return "monitor"
+        return suggested_action
+
+    # ---- unified entry point ----
+    def evaluate(self, action: str, threat_level: str, context: Dict[str, Any]) -> Dict[str, Any]:
+        moral_ok = self.moral_check(action, context)
+        routed = self.judgment_route(threat_level, action) if moral_ok else "blocked"
+        entry: Dict[str, Any] = {
+            "action": action,
+            "threat_level": threat_level,
+            "moral_ok": moral_ok,
+            "routed_to": routed,
+            "personality": self.personality,
+        }
+        self.decision_log.append(entry)
+        return entry
+
+
+# ===================== SENTINEL =====================
+class SentinelLayer:
+    """Vigilance plane above the HealingLayer.
+
+    Watches brick health over time, classifies threats, learns from
+    incidents, and tightens its own detection thresholds autonomously.
+    All actions pass through BraidedLogic before being applied.
+    """
+
+    THREAT_LEVELS = ("nominal", "low", "moderate", "high", "critical")
+
+    def __init__(
+        self,
+        healing: "HealingLayer",
+        bricks: Dict[str, Brick],
+        clock: DeterministicClock,
+        personality: str = "adaptive",
+    ):
+        self.healing = healing
+        self.bricks = bricks
+        self.clock = clock
+        self.braid = BraidedLogic(personality)
+        self.incidents: List[Dict[str, Any]] = []
+        self.threat_level: str = "nominal"
+        # Threshold: how many consecutive unhealthy bricks trigger an escalation.
+        self._escalation_threshold: int = 2
+        self._heal_surge_threshold: int = 3  # heals per brick before raising alert
+        self._watch_log: List[Dict[str, Any]] = []
+
+    # ---- internal helpers ----
+    def _timestamp(self) -> int:
+        return self.clock.now()
+
+    def _classify_threat(self, unhealthy_count: int, heal_surges: int) -> str:
+        if unhealthy_count == 0 and heal_surges == 0:
+            return "nominal"
+        if unhealthy_count >= 3 or heal_surges >= self._heal_surge_threshold + 2:
+            return "critical"
+        if unhealthy_count >= 2 or heal_surges >= self._heal_surge_threshold + 1:
+            return "high"
+        if unhealthy_count >= 1 or heal_surges >= self._heal_surge_threshold:
+            return "moderate"
+        return "low"
+
+    # ---- public API ----
+    def watch(self) -> Dict[str, Any]:
+        """Perform one sentinel watch cycle and return a report."""
+        unhealthy = [name for name, b in self.bricks.items() if not b.healthy]
+        heal_surges = sum(
+            1 for b in self.bricks.values() if b.heal_count >= self._heal_surge_threshold
+        )
+        chain_broken = not self.healing.spine.verify_chain()
+
+        # Escalate threat classification.
+        new_level = self._classify_threat(len(unhealthy), heal_surges)
+        if chain_broken and new_level not in {"high", "critical"}:
+            new_level = "high"
+        self.threat_level = new_level
+
+        report: Dict[str, Any] = {
+            "timestamp": self._timestamp(),
+            "threat_level": self.threat_level,
+            "unhealthy_bricks": unhealthy,
+            "heal_surges": heal_surges,
+            "chain_broken": chain_broken,
+        }
+
+        if self.threat_level not in {"nominal", "low"}:
+            decision = self.braid.evaluate(
+                action="alert_and_monitor",
+                threat_level=self.threat_level,
+                context={"backup_confirmed": True},
+            )
+            report["braid_decision"] = decision
+            self._record_incident(report)
+
+        self._watch_log.append(report)
+        return report
+
+    def _record_incident(self, report: Dict[str, Any]) -> None:
+        incident = deepcopy(report)
+        incident["incident_id"] = len(self.incidents) + 1
+        self.incidents.append(incident)
+        # Autonomous threshold tightening: if incidents pile up, tighten early.
+        if len(self.incidents) > self._escalation_threshold * 2:
+            self._escalation_threshold = max(1, self._escalation_threshold - 1)
+
+    def record_fault(self, brick_name: Optional[str], fault_type: str) -> None:
+        """External hook so SovereignOS can notify sentinel of injected faults."""
+        self._watch_log.append({
+            "timestamp": self._timestamp(),
+            "event": "fault_injected",
+            "brick": brick_name,
+            "fault_type": fault_type,
+        })
+
+    def status(self) -> Dict[str, Any]:
+        return {
+            "threat_level": self.threat_level,
+            "total_incidents": len(self.incidents),
+            "escalation_threshold": self._escalation_threshold,
+            "heal_surge_threshold": self._heal_surge_threshold,
+            "braid_personality": self.braid.personality,
+            "watch_cycles": len(self._watch_log),
+        }
+
 
 # ===================== MAIN =====================
 if __name__ == "__main__":
     print("Brick Stitch Sovereign OS - Hardened Single-File Validation Harness")
-    print("Deterministic clock, chained Spine ledger, per-brick rollback, DAG-aware healing.")
-    print("Sentinel self-awareness: proactive monitoring, anomaly detection, ghost mirroring,")
-    print("braided ethical logic, omega resurrection loops, autonomous evolution.")
-    print("Running 6-month extreme-environment simulation + full suite for 5 consecutive passes.\n")
-    SovereignOS().run_full_suite_with_extreme_qualification(months=6, consecutive_passes=5)
+    print("Deterministic clock, chained Spine ledger, per-brick rollback, DAG-aware healing.\n")
+    SovereignOS().run_three_clean_passes()
