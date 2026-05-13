@@ -1,0 +1,21 @@
+{
+  "id": "entry-0001",
+  "timestamp": 1747094400,
+  "event": "MANIFEST_CREATED",
+  "capabilities": [
+    "snapshot",
+    "rollback",
+    "diff-tracking",
+    "replica verification"
+  ],
+  "validRule": "HASH_MATCH AND SIGNATURE_VALID AND MANIFEST_MATCH AND TOPOLOGY_CONSISTENT",
+  "runtime": "runtime uses quantum-inspired topology and fault-tolerant verification structure",
+  "verification": {
+    "hashMatch": true,
+    "signatureValid": true,
+    "manifestMatch": true,
+    "topologyConsistent": true
+  },
+  "valid": true,
+  "sha256": "827f50af5d072b37c6b4e209cce7680e4169523c288765b98e1c63479033bcfe"
+}
