@@ -12,6 +12,7 @@ export * from "./stem/StemTriBraid";
 export * from "./brain/BrainAdapter";
 export * from "./ghost/GhostNode";
 export * from "./quantum/QuantumDistributionValidator";
+export * from "./quantum/QuantumDecisionSampler";
 export * from "./failure/FailureManager";
 export * from "./runtime/BraidedRuntime";
 export * from "./system/IntegratedSystem";
