@@ -9,13 +9,23 @@ import type {
   UserIntent
 } from "../contracts/runtime";
 import { QuantumDistributionValidator } from "../quantum/QuantumDistributionValidator";
+import { HyperdimensionalComputing } from "../quantum/HyperdimensionalComputing";
 import { hashOf } from "../utils/hash";
 
+/**
+ * ENHANCED: Phase 1 - Hyperdimensional Computing for semantic truth verification
+ */
 export class LiquidTruthNodeMesh {
   private readonly quantum: QuantumDistributionValidator;
+  private readonly hdc: HyperdimensionalComputing;
 
   constructor(quantum = new QuantumDistributionValidator()) {
     this.quantum = quantum;
+    this.hdc = new HyperdimensionalComputing(10000);
+
+    // Initialize semantic vectors for common truth states
+    this.hdc.encode({ verified: true, confidence: 1.0 }, "valid_state");
+    this.hdc.encode({ verified: false, confidence: 0.0 }, "invalid_state");
   }
 
   validatePreBrain(intent: UserIntent, permit: SpinePermit): Result<TruthReport> {
@@ -40,7 +50,13 @@ export class LiquidTruthNodeMesh {
       }
     ];
 
-    return this.report("pre-brain", findings);
+    // Hyperdimensional semantic verification
+    const hdcReport = this.hdc.verifyTruth(
+      { intent: intent.text, permit: permit.approved },
+      "valid_state"
+    );
+
+    return this.report("pre-brain", findings, hdcReport.confidenceScore);
   }
 
   validatePostBrain(output: BrainOutput, packet: StemPacket): Result<TruthReport> {
@@ -100,9 +116,12 @@ export class LiquidTruthNodeMesh {
     return this.report("failure-verify", findings);
   }
 
-  private report(phase: TruthReport["phase"], findings: readonly TruthFinding[]): Result<TruthReport> {
+  private report(phase: TruthReport["phase"], findings: readonly TruthFinding[], hdcConfidence = 1.0): Result<TruthReport> {
     const verified = findings.every((finding) => finding.passed);
-    const confidence = findings.reduce((sum, finding) => sum + finding.confidence, 0) / findings.length;
+    const baseConfidence = findings.reduce((sum, finding) => sum + finding.confidence, 0) / findings.length;
+
+    // Combine classical and hyperdimensional confidence
+    const confidence = (baseConfidence + hdcConfidence) / 2;
 
     const confidenceDistribution = {
       name: `${phase}.confidence`,
@@ -123,7 +142,7 @@ export class LiquidTruthNodeMesh {
       verified,
       confidence,
       findings,
-      meshSignature: hashOf({ phase, verified, confidence, findings })
+      meshSignature: hashOf({ phase, verified, confidence, findings, hdcConfidence })
     };
 
     if (!verified) {
