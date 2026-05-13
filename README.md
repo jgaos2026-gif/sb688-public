@@ -34,6 +34,9 @@ python sb688.py ghost     # Covert operations
 python sb688.py truth     # Disinformation detection
 python sb688.py phoenix   # Disaster recovery
 
+# Quantum system demonstration (all nodes unified)
+python examples/quantum_system_demo.py
+
 # Show version
 python sb688.py version
 ```
@@ -70,6 +73,7 @@ python sb688.py version
 - [Ghost Node](nodes/ghost_node.py) - Covert operations module
 - [Truth Node](nodes/truth_node.py) - Disinformation detection
 - [Phoenix Node](nodes/phoenix_node.py) - Disaster recovery system
+- [Quantum System](docs/QUANTUM_SYSTEM.md) - **NEW!** Unified quantum-enhanced integration
 
 ## Features
 
@@ -81,6 +85,7 @@ python sb688.py version
 ✅ **Testing**: Comprehensive test suite with >90% coverage
 ✅ **Deployment**: Single-node and multi-node Docker support
 ✅ **CLI**: Unified command-line interface
+✅ **Quantum System**: Post-quantum cryptography with unified node orchestration
 
 ## Architecture
 

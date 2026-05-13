@@ -57,7 +57,8 @@ class QuantumOrchestrator:
 
         # Initialize base SB-688 engine
         self.engine = SB688Engine()
-        self.engine.unlock_sensitive_access(1211)
+        # Note: unlock_sensitive_access not needed for quantum orchestrator
+        # as it operates at the system level with quantum credentials
 
         # Initialize nodes
         self.nodes: Dict[str, Any] = {}
@@ -86,7 +87,7 @@ class QuantumOrchestrator:
             ghost = GhostNode(
                 clearance_level="TOP_SECRET",
                 compartment="QUANTUM_OPS",
-                user_id="ORCHESTRATOR"
+                authorized_users=["ORCHESTRATOR", "QUANTUM_SYSTEM"]
             )
             node_id = "GHOST_001"
             self.nodes[node_id] = {
@@ -98,7 +99,7 @@ class QuantumOrchestrator:
 
         # Truth Node - Disinformation Detection
         if self.config.enable_truth:
-            truth = TruthNode(node_id="TRUTH_001", trust_threshold=0.80)
+            truth = TruthNode(trust_threshold=0.80)
             node_id = "TRUTH_001"
             self.nodes[node_id] = {
                 "type": "TRUTH",
@@ -110,9 +111,7 @@ class QuantumOrchestrator:
         # Phoenix Node - Disaster Recovery
         if self.config.enable_phoenix:
             phoenix = PhoenixNode(
-                node_id="PHOENIX_001",
-                sync_interval_hours=48,
-                mode="DORMANT"
+                node_id="PHOENIX_001"
             )
             node_id = "PHOENIX_001"
             self.nodes[node_id] = {
@@ -250,7 +249,7 @@ class QuantumOrchestrator:
         quantum_integrity = self.quantum_system.verify_quantum_integrity()
 
         # Check base engine
-        engine_state = self.engine.get_state(include_sensitive=True)
+        engine_state = self.engine.get_state()
         engine_health = engine_state.get("health", 100.0)
 
         # Check individual nodes
