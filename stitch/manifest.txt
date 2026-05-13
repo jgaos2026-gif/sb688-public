@@ -1,3 +1,4 @@
+./.git/COMMIT_EDITMSG
 ./.git/FETCH_HEAD
 ./.git/HEAD
 ./.git/config
@@ -166,6 +167,9 @@
 ./src/upload/contracts.ts
 ./src/utils/hash.ts
 ./src/utils/time.ts
+./stitch/genesis.json
+./stitch/ledger.log
+./stitch/manifest.sha256
 ./stitch/manifest.txt
 ./stitch_manifest.sha256
 ./stitch_manifest.txt

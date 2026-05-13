@@ -1,0 +1,5 @@
+[1] manifest created :: stitch/manifest.txt
+[2] hash computed :: sha256=a1835fcd0e28266918e6a99c7ad2295a9794cdeb7756467ced2eb6bc76b9cb5a
+[3] ledger entry sealed :: stitch/genesis.json
+[4] verify digest :: a1835fcd0e28266918e6a99c7ad2295a9794cdeb7756467ced2eb6bc76b9cb5a  stitch/manifest.txt
+[5] bind complete :: stitch/genesis.json -> stitch/ledger.log

@@ -1,10 +1,14 @@
 {
+  "runtime": "sb689-braided-runtime",
+  "version": "1.1.1",
+  "owner": "JGA",
+  "protocol": "SB689_OMEGA",
+  "created": "2026-05-13T00:00:00Z",
   "chain": "manifest->hash->ledger-entry->verify->bind",
-  "createdAt": "2026-05-13T13:48:07.915193Z",
   "manifest": {
     "path": "stitch/manifest.txt",
     "hashAlgorithm": "sha256",
-    "hash": "0a018d64a7ffbb80601783d5f0a99965fa1b02a2b58410be0bc5461532608717"
+    "hash": "a1835fcd0e28266918e6a99c7ad2295a9794cdeb7756467ced2eb6bc76b9cb5a"
   },
   "artifacts": [
     "stitch/genesis.json",
