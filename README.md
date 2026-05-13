@@ -83,6 +83,7 @@ src/
 brick_stitch_sovereign_os.py   Core Python OS simulator + Sentinel layer
 android_app.py                 Kivy Android UI (touch-compatible)
 quantum_geometry_upgrade.py    Rotated surface code geometry validator
+adaptive_resilience_kernel.py  Node resilience monitoring with recovery vault
 buildozer.spec                 Android APK build configuration
 requirements.txt               Python runtime dependencies
 demo/           Runnable end-to-end demo
@@ -117,6 +118,10 @@ python android_app.py
 
 # Run quantum geometry upgrade for rotated surface codes
 python quantum_geometry_upgrade.py
+
+# Run adaptive resilience kernel (node monitoring with recovery)
+python adaptive_resilience_kernel.py
+python adaptive_resilience_kernel.py --nodes 8 --cycles 50 --stress 1.5 --delay 0.05
 
 # Build Android APK (requires Buildozer + Android NDK/SDK)
 buildozer android debug
