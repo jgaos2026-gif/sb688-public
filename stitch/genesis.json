@@ -1,0 +1,15 @@
+{
+  "chain": "manifest->hash->ledger-entry->verify->bind",
+  "createdAt": "2026-05-13T13:48:07.915193Z",
+  "manifest": {
+    "path": "stitch/manifest.txt",
+    "hashAlgorithm": "sha256",
+    "hash": "0a018d64a7ffbb80601783d5f0a99965fa1b02a2b58410be0bc5461532608717"
+  },
+  "artifacts": [
+    "stitch/genesis.json",
+    "stitch/manifest.txt",
+    "stitch/manifest.sha256",
+    "stitch/ledger.log"
+  ]
+}
