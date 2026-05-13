@@ -1,0 +1,4 @@
+genesis.json
+manifest.txt
+manifest.sha256
+ledger.log
