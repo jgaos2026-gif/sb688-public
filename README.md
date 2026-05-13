@@ -146,6 +146,7 @@ const handshake = omega.connectToStitch();
   outer walls and traps
 - [docs/WHITEPAPER.md](docs/WHITEPAPER.md) — protocol & evidence labels
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — module map
+- [docs/SINGULARITY.md](docs/SINGULARITY.md) — **NEW:** Phase 1 next-gen quantum, hyperdimensional, and neuromorphic technologies
 - [docs/ANDROID.md](docs/ANDROID.md) — Android build & deployment
 - [docs/SECURITY.md](docs/SECURITY.md) — what is and is not claimed
 - [docs/GOVERNANCE.md](docs/GOVERNANCE.md) — change classes, PR rules
