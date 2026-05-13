@@ -104,6 +104,20 @@ npm run system     # build + run full backend + frontend console on :6890
 
 Open `http://127.0.0.1:6890` for the complete system console.
 
+### Branch Consolidation (All Branches → One Workspace)
+
+This repo is actively developed across multiple branches. To snapshot every remote branch into a single consolidated folder:
+
+```bash
+python tools/consolidate_branches.py
+```
+
+Outputs are written under `consolidated/` (gitignored) and include `consolidated/manifest.json`.
+
+### Quantum Sampling (Next-Gen Primitive)
+
+`QuantumDecisionSampler` converts a validated probability distribution into a deterministic decision when provided a seeded RNG.
+
 ### Python / Android
 
 ```bash
