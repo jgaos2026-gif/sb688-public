@@ -45,7 +45,7 @@ export function evaluateManifestValidity(signals: ManifestVerificationSignals): 
   return signals.hashMatch && signals.signatureValid && signals.manifestMatch && signals.topologyConsistent;
 }
 
-export function forgeManifestCreatedEntry(input: {
+export function createManifestCreatedEntry(input: {
   readonly id: string;
   readonly timestamp: number;
   readonly verification: ManifestVerificationSignals;
@@ -63,6 +63,8 @@ export function forgeManifestCreatedEntry(input: {
   const sha256 = sha256Hex(payload);
   return Object.freeze({ ...payload, sha256 });
 }
+
+export const forgeManifestCreatedEntry = createManifestCreatedEntry;
 
 export function verifyReplicaManifest(
   primary: ManifestCreatedEntry,
