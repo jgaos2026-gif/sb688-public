@@ -35,7 +35,7 @@ python sb688.py truth     # Disinformation detection
 python sb688.py phoenix   # Disaster recovery
 
 # Quantum system demonstration (all nodes unified)
-python examples/quantum_system_demo.py
+python examples/quantum_core_demo.py
 
 # Show version
 python sb688.py version
