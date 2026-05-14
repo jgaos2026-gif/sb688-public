@@ -21,3 +21,4 @@ export * from "./upload/UploadSentinel";
 export * from "./upload/FileUploadManager";
 export * from "./omega";
 export * from "./agent";
+export * from "./physics/OhmsLaw";
