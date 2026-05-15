@@ -38,6 +38,6 @@
   "homepage": "https://www.jgaos2026-gif.com",
   "devDependencies": {
     "@types/node": "25.7.0",
-    "typescript": "5.9.3"
+    "typescript": "6.0.3"
   }
 }
