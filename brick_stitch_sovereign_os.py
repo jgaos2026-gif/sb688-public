@@ -641,7 +641,91 @@ class SovereignOS:
         }
         return passed, report
 
-    def run_all_tests_once(self, verbose: bool = True) -> bool:
+    def run_extreme_environment_simulation(self, months: int = 6, verbose: bool = True) -> Tuple[bool, Dict[str, Any]]:
+        """Run a month-by-month endurance simulation across extreme environments.
+
+        Applies a rotating stress profile (space, sea, land, underwater, cosmic-ray burst,
+        and compound worst-case events), attempts automated repair/recovery, and validates
+        health + ledger integrity after each month.
+        """
+        self.setup_system()
+        boot_ok = self.operations.boot()
+        if not boot_ok:
+            return False, {"test": "11. Extreme Environment Endurance (6-Month)", "months": months, "reason": "boot_failed"}
+
+        monthly_stress_plan: List[Tuple[str, List[Tuple[Optional[str], str]]]] = [
+            ("Space vacuum + thermal cycling", [("core", "dependency_failure"), ("driver_net", "driver_fault")]),
+            ("Sea-salt corrosion + storm surge", [("fs", "storage_corrupt"), ("driver_net", "runtime_crash")]),
+            ("Land dust + seismic disruption", [("core", "runtime_crash"), ("user_app", "dependency_failure")]),
+            ("Underwater pressure + comms disruption", [("driver_net", "driver_fault"), ("fs", "partial_update")]),
+            ("Cosmic-ray burst + ledger integrity attack", [(None, "spine_tamper"), ("core", "corrupt")]),
+            ("Worst-case compound cascade", [(None, "heal_layer_fault"), ("user_app", "corrupt"), ("fs", "storage_corrupt"), ("core", "dependency_failure")]),
+        ]
+
+        month_reports: List[Dict[str, Any]] = []
+
+        for month in range(1, months + 1):
+            profile_name, events = monthly_stress_plan[(month - 1) % len(monthly_stress_plan)]
+            month_ok = True
+            month_rounds = 0
+
+            for brick_name, fault_type in events:
+                self.inject_fault(brick_name, fault_type)
+                repaired = False
+
+                for _ in range(self.spine.policy["max_repair_rounds_per_test"]):
+                    month_rounds += 1
+                    if self.attempt_repair(brick_name, fault_type):
+                        repaired = True
+                        break
+                    self.sentinel.watch()
+
+                if not repaired:
+                    month_ok = False
+                    break
+
+            valid, details = self.validate_system()
+            sentinel = self.sentinel.watch()
+            month_ok = month_ok and valid
+
+            month_report = {
+                "month": month,
+                "profile": profile_name,
+                "repair_rounds": month_rounds,
+                "passed": month_ok,
+                "details": details,
+                "sentinel": sentinel,
+                "ledger_head": self.spine.current_version,
+            }
+            month_reports.append(month_report)
+
+            if verbose:
+                status = "PASS" if month_ok else "FAIL"
+                print(
+                    f"11.{month} Extreme Month {month} ({profile_name}): {status} "
+                    f"| rounds={month_rounds} | head=v{self.spine.current_version} "
+                    f"| sentinel={sentinel.get('threat_level', 'n/a')}"
+                )
+
+            if not month_ok:
+                return False, {
+                    "test": "11. Extreme Environment Endurance (6-Month)",
+                    "months": months,
+                    "month": month,
+                    "profile": profile_name,
+                    "details": details,
+                    "month_reports": month_reports,
+                }
+
+        return True, {
+            "test": "11. Extreme Environment Endurance (6-Month)",
+            "months": months,
+            "ledger_head": self.spine.current_version,
+            "month_reports": month_reports,
+            "sentinel": self.sentinel.status(),
+        }
+
+    def _run_all_tests(self, verbose: bool, include_extreme: bool, extreme_months: int) -> bool:
         tests = [
             ("1. Runtime Process Corruption", "user_app", "corrupt"),
             ("2. Driver-Level Fault", "driver_net", "driver_fault"),
@@ -669,7 +753,28 @@ class SovereignOS:
                 if not passed:
                     print(f"  details={report['details']}")
             all_passed = all_passed and passed
+
+        if include_extreme:
+            passed, report = self.run_extreme_environment_simulation(months=extreme_months, verbose=verbose)
+            if verbose:
+                status = "PASS" if passed else "FAIL"
+                print(
+                    f"{report['test']}: {status} | months={report['months']} "
+                    f"| head=v{report.get('ledger_head', self.spine.current_version)} "
+                    f"| sentinel={report.get('sentinel', {}).get('threat_level', 'n/a')}"
+                )
+                if not passed:
+                    print(f"  details={report.get('details')}")
+            all_passed = all_passed and passed
         return all_passed
+
+    def run_all_tests_once(self, verbose: bool = True) -> bool:
+        """Run the standard 10-scenario suite once."""
+        return self._run_all_tests(verbose=verbose, include_extreme=False, extreme_months=6)
+
+    def run_all_tests_with_extreme(self, verbose: bool = True, extreme_months: int = 6) -> bool:
+        """Run the standard suite plus extreme-environment endurance simulation."""
+        return self._run_all_tests(verbose=verbose, include_extreme=True, extreme_months=extreme_months)
 
     def sentinel_status(self) -> Dict[str, Any]:
         """Return the current sentinel status dict."""
@@ -688,6 +793,25 @@ class SovereignOS:
             print(f"Run #{run}: FULL PASS")
         print(f"\nALL TESTS PASSED {streak} TIMES IN A ROW - SYSTEM READY")
         return True
+
+    def run_full_suite_with_extreme_qualification(self, months: int = 6, consecutive_passes: int = 5) -> bool:
+        """Execute full-suite + extreme endurance qualification for consecutive passes."""
+        streak = 0
+        for run in range(1, consecutive_passes + 1):
+            print(f"\n--- EXTREME QUALIFICATION RUN #{run} ---")
+            fresh = SovereignOS()
+            passed = fresh.run_all_tests_with_extreme(verbose=True, extreme_months=months)
+            if not passed:
+                print(f"Extreme qualification run #{run}: FAIL")
+                return False
+            streak += 1
+            print(f"Extreme qualification run #{run}: FULL PASS")
+        print(f"\nEXTREME 6-MONTH SIMULATION + FULL SUITE PASSED {streak} TIMES IN A ROW - SYSTEM READY")
+        return True
+
+    def run_extreme_qualification(self, months: int = 6, consecutive_passes: int = 5) -> bool:
+        """Alias for extreme full-suite qualification runs."""
+        return self.run_full_suite_with_extreme_qualification(months=months, consecutive_passes=consecutive_passes)
 
 
 # ===================== BRAIDED LOGIC =====================
@@ -856,5 +980,6 @@ class SentinelLayer:
 # ===================== MAIN =====================
 if __name__ == "__main__":
     print("Brick Stitch Sovereign OS - Hardened Single-File Validation Harness")
-    print("Deterministic clock, chained Spine ledger, per-brick rollback, DAG-aware healing.\n")
-    SovereignOS().run_three_clean_passes()
+    print("Deterministic clock, chained Spine ledger, per-brick rollback, DAG-aware healing.")
+    print("Running 6-month extreme-environment simulation + full suite for 5 consecutive passes.\n")
+    SovereignOS().run_full_suite_with_extreme_qualification(months=6, consecutive_passes=5)
