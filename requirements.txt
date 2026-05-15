@@ -7,7 +7,7 @@
 # under the `requirements` key (Buildozer handles cross-compilation).
 
 # Core OS dependency
-networkx==3.4.2
+networkx==3.6.1
 
 # Android / desktop UI toolkit
 # On Android this is installed automatically by Buildozer.
