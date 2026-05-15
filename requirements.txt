@@ -16,7 +16,7 @@ kivy==2.3.0
 
 # Kivy source builds can fail with newer Cython releases (exception spec checks
 # in cgl_backend); pin to a stable compatible release.
-cython==0.29.37
+cython==3.2.4
 
 # Buildozer — Android APK packaging tool (dev-machine only, not on device)
 # Install separately:  pip install buildozer
