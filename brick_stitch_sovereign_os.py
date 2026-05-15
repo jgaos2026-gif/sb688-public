@@ -202,7 +202,7 @@ class SentinelLayer:
         self._seen_hashes: set = set()
 
     def scan(self, filename: str, content: bytes, content_type: str) -> Tuple[bool, List[str]]:
-        """Return (clean, anomalies). Records anomalies to the spine upload log."""
+        """Return (clean, anomalies). Does not modify the spine log; callers (FileUploadManager) log events."""
         anomalies: List[str] = []
 
         if len(content) == 0:
@@ -227,28 +227,75 @@ class SentinelLayer:
 
         return len(anomalies) == 0, anomalies
 
+# Maximum number of files held in the in-memory store.
+_UPLOAD_MAX_STORE_COUNT = 1_000
+
 
 # ===================== FILE UPLOAD MANAGER =====================
 class FileUploadManager:
     """Handles incoming file uploads and autonomous self-dispatch.
 
     All events are recorded in the Spine's tamper-evident upload log.
+    The store enforces a file-count cap (max_store_count) to prevent unbounded memory growth.
     """
 
-    def __init__(self, spine: "Spine", bricks: Dict[str, Brick], sentinel: SentinelLayer, clock: DeterministicClock):
+    def __init__(
+        self,
+        spine: "Spine",
+        bricks: Dict[str, Brick],
+        sentinel: SentinelLayer,
+        clock: DeterministicClock,
+        max_store_count: int = _UPLOAD_MAX_STORE_COUNT,
+    ):
         self.spine = spine
         self.bricks = bricks
         self.sentinel = sentinel
         self.clock = clock
+        self._max_store_count = max_store_count
         self._store: Dict[str, Dict] = {}
 
     def receive(self, filename: str, content: bytes, content_type: str = "application/octet-stream") -> Tuple[bool, Dict]:
         """Receive an incoming file upload, validate through the sentinel, and store."""
         ts = self.clock.now()
+
+        # Check filename collision before scanning.
+        if filename in self._store:
+            anomalies = ["filename_already_stored"]
+            content_hash = hash_blob(content)
+            event: Dict = {
+                "action": "receive_upload",
+                "filename": filename,
+                "content_type": content_type,
+                "size": len(content),
+                "content_hash": content_hash,
+                "anomalies": anomalies,
+                "status": "rejected",
+                "timestamp": ts,
+            }
+            self.spine.append_upload_event(event)
+            return False, {"status": "rejected", "anomalies": anomalies, "filename": filename}
+
+        # Enforce store count cap before running the sentinel.
+        if len(self._store) >= self._max_store_count:
+            anomalies = ["store_count_limit_exceeded"]
+            content_hash = hash_blob(content)
+            event = {
+                "action": "receive_upload",
+                "filename": filename,
+                "content_type": content_type,
+                "size": len(content),
+                "content_hash": content_hash,
+                "anomalies": anomalies,
+                "status": "rejected",
+                "timestamp": ts,
+            }
+            self.spine.append_upload_event(event)
+            return False, {"status": "rejected", "anomalies": anomalies, "filename": filename}
+
         clean, anomalies = self.sentinel.scan(filename, content, content_type)
         content_hash = hash_blob(content)
 
-        event: Dict = {
+        event = {
             "action": "receive_upload",
             "filename": filename,
             "content_type": content_type,
@@ -303,7 +350,7 @@ class FileUploadManager:
             })
             return False, {"status": "failed", "reason": "file_not_found", "filename": filename}
 
-        if ".." in destination or destination.startswith("/") or destination.startswith("\\"):
+        if ".." in destination or "/" in destination or "\\" in destination:
             self.spine.append_upload_event({
                 "action": "dispatch_upload",
                 "filename": filename,

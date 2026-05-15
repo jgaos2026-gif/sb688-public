@@ -137,6 +137,39 @@ def test_dispatch_invalid_destination():
     assert result["reason"] == "invalid_destination"
 
 
+def test_dispatch_destination_with_embedded_separator():
+    """Destination containing / or \\ mid-string must also be rejected."""
+    spine, bricks, sentinel, mgr = make_stack()
+    mgr.receive("inv.pdf", b"bytes", "application/pdf")
+    ok_slash, r1 = mgr.dispatch("inv.pdf", "invoices/2026")
+    assert ok_slash is False, f"Expected rejection, got {r1}"
+    assert r1["reason"] == "invalid_destination"
+
+    ok_back, r2 = mgr.dispatch("inv.pdf", "invoices\\archive")
+    assert ok_back is False, f"Expected rejection, got {r2}"
+    assert r2["reason"] == "invalid_destination"
+
+
+def test_receive_rejects_duplicate_filename():
+    spine, bricks, sentinel, mgr = make_stack()
+    mgr.receive("dup.txt", b"first", "text/plain")
+    ok, result = mgr.receive("dup.txt", b"second", "text/plain")
+    assert ok is False
+    assert "filename_already_stored" in result["anomalies"]
+
+
+def test_receive_rejects_when_store_count_exceeded():
+    spine, bricks, sentinel, _ = make_stack()
+    # Use a small limit so the test can exercise the cap via the public API.
+    mgr = FileUploadManager(spine, bricks, sentinel, spine.clock, max_store_count=3)
+    for i in range(3):
+        ok, _ = mgr.receive(f"file_{i}.txt", f"content_{i}".encode(), "text/plain")
+        assert ok is True, f"Expected file_{i}.txt to be accepted"
+    ok, result = mgr.receive("overflow.txt", b"data", "text/plain")
+    assert ok is False
+    assert "store_count_limit_exceeded" in result["anomalies"]
+
+
 # ──────────────────────────────────────────────
 # Tamper-evident upload log (Spine)
 # ──────────────────────────────────────────────
@@ -201,9 +234,12 @@ if __name__ == "__main__":
         test_receive_valid_upload,
         test_receive_rejected_by_sentinel,
         test_receive_fails_when_fs_brick_unhealthy,
+        test_receive_rejects_duplicate_filename,
+        test_receive_rejects_when_store_count_exceeded,
         test_dispatch_stored_file,
         test_dispatch_unknown_file,
         test_dispatch_invalid_destination,
+        test_dispatch_destination_with_embedded_separator,
         test_upload_log_is_tamper_evident,
         test_upload_log_detects_tampering,
         test_sovereign_os_has_upload_brick,

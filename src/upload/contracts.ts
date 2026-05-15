@@ -1,6 +1,6 @@
 export interface UploadRequest {
   readonly filename: string;
-  /** Base64-encoded or plain-text content of the file being uploaded. */
+  /** Plain UTF-8 text content of the file being uploaded. Size is enforced in bytes. */
   readonly content: string;
   readonly contentType?: string;
 }

@@ -27,3 +27,16 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run demo
+
+  python-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Python dependencies
+        run: pip install networkx pytest
+      - name: Run Python upload tests
+        run: python -m pytest test_file_upload.py -v

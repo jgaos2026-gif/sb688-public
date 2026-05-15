@@ -1,9 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AuditLedger } from "../src/ledger/AuditLedger";
-import { FileUploadManager } from "../src/upload/FileUploadManager";
-import { UploadSentinel } from "../src/upload/UploadSentinel";
-import { IntegratedSystem } from "../src/system/IntegratedSystem";
+import {
+  AuditLedger,
+  FileUploadManager,
+  UploadSentinel,
+  IntegratedSystem
+} from "../src";
 import { fixedClock } from "../src/utils/time";
 
 const AT = "2026-05-01T00:00:00.000Z";
@@ -134,4 +136,59 @@ test("IntegratedSystem exposes uploadManager that shares the audit ledger", () =
   assert.equal(system.ledgerValid(), true);
   assert.ok(system.ledgerEntries().length > 0);
   assert.equal(system.uploadManager.verifyUploadLog(), true);
+});
+
+test("FileUploadManager rejects duplicate filename", () => {
+  const ledger = new AuditLedger();
+  const mgr = new FileUploadManager(ledger, undefined, fixedClock(AT));
+
+  mgr.receive({ filename: "dup.txt", content: "first", contentType: "text/plain" });
+  const second = mgr.receive({ filename: "dup.txt", content: "second", contentType: "text/plain" });
+
+  assert.equal(second.accepted, false);
+  assert.ok(second.anomalies.includes("filename_already_stored"));
+  assert.equal(ledger.verifyChain(), true);
+});
+
+test("FileUploadManager rejects destination with embedded path separator", () => {
+  const ledger = new AuditLedger();
+  const mgr = new FileUploadManager(ledger, undefined, fixedClock(AT));
+
+  mgr.receive({ filename: "data.json", content: '{"x":1}', contentType: "application/json" });
+  const result = mgr.dispatch({ filename: "data.json", destination: "invoices/2026" });
+
+  assert.equal(result.dispatched, false);
+  assert.equal(ledger.verifyChain(), true);
+});
+
+test("FileUploadManager records file_not_found dispatch in audit ledger", () => {
+  const ledger = new AuditLedger();
+  const mgr = new FileUploadManager(ledger, undefined, fixedClock(AT));
+
+  const before = ledger.entries().length;
+  mgr.dispatch({ filename: "ghost.txt", destination: "archive" });
+  const after = ledger.entries().length;
+
+  assert.ok(after > before, "Audit ledger should have a new entry for file_not_found dispatch");
+  assert.equal(ledger.verifyChain(), true);
+});
+
+test("FileUploadManager uploadLog entries are immutable", () => {
+  const ledger = new AuditLedger();
+  const mgr = new FileUploadManager(ledger, undefined, fixedClock(AT));
+
+  mgr.receive({ filename: "x.txt", content: "data", contentType: "text/plain" });
+  const entries = mgr.uploadLog();
+
+  // Attempt mutation — must not affect the internal state.
+  const entry = entries[0] as Record<string, unknown>;
+  try {
+    entry["filename"] = "MUTATED";
+  } catch {
+    // Strict-mode freeze throws a TypeError; that's fine.
+  }
+
+  // The internal log should still have the original filename.
+  assert.equal(mgr.uploadLog()[0].filename, "x.txt");
+  assert.equal(mgr.verifyUploadLog(), true);
 });

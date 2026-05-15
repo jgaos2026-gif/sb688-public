@@ -7,6 +7,13 @@ export interface SystemServerOptions {
   readonly seedState?: Readonly<Record<string, unknown>>;
 }
 
+/** Maximum request body size for upload endpoints: 10 MB + 64 KB overhead for JSON framing. */
+const UPLOAD_MAX_BODY_BYTES = 10 * 1024 * 1024 + 64 * 1024;
+
+type BodyResult =
+  | { ok: true; data: Record<string, unknown> }
+  | { ok: false; status: 400 | 413; error: string };
+
 export function startSystemServer(options: SystemServerOptions = {}): void {
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 6890;
@@ -128,7 +135,12 @@ async function routeRequest(
   }
 
   if (method === "POST" && url === "/api/upload") {
-    const body = await readJsonBody(request);
+    const bodyResult = await readUploadBody(request, UPLOAD_MAX_BODY_BYTES);
+    if (!bodyResult.ok) {
+      sendJson(response, bodyResult.status, { ok: false, error: bodyResult.error });
+      return;
+    }
+    const body = bodyResult.data;
     const filename = typeof body.filename === "string" ? body.filename.trim() : "";
     const content = typeof body.content === "string" ? body.content : "";
     const contentType =
@@ -148,7 +160,12 @@ async function routeRequest(
   }
 
   if (method === "POST" && url === "/api/upload/dispatch") {
-    const body = await readJsonBody(request);
+    const bodyResult = await readUploadBody(request, UPLOAD_MAX_BODY_BYTES);
+    if (!bodyResult.ok) {
+      sendJson(response, bodyResult.status, { ok: false, error: bodyResult.error });
+      return;
+    }
+    const body = bodyResult.data;
     const filename = typeof body.filename === "string" ? body.filename.trim() : "";
     const destination = typeof body.destination === "string" ? body.destination.trim() : "";
 
@@ -196,6 +213,52 @@ async function readJsonBody(request: IncomingMessage): Promise<Record<string, un
   } catch {
     return {};
   }
+}
+
+/**
+ * Reads the request body for upload routes, enforcing a maximum byte limit and
+ * returning explicit errors for oversized payloads or malformed JSON.
+ */
+async function readUploadBody(request: IncomingMessage, maxBytes: number): Promise<BodyResult> {
+  const contentLength = request.headers["content-length"];
+  if (contentLength !== undefined) {
+    const declared = parseInt(contentLength, 10);
+    if (!isNaN(declared) && declared > maxBytes) {
+      // Begin draining the stream so the TCP connection stays usable after the
+      // 413 response is sent (prevents the client from getting a connection reset).
+      request.resume();
+      return { ok: false, status: 413, error: `Request body too large (declared ${declared} bytes; limit ${maxBytes})` };
+    }
+  }
+
+  const chunks: Buffer[] = [];
+  let totalBytes = 0;
+
+  for await (const chunk of request) {
+    const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    totalBytes += buf.byteLength;
+    if (totalBytes > maxBytes) {
+      // Drain the remainder so the TCP connection stays usable after the 413 response.
+      request.resume();
+      return { ok: false, status: 413, error: `Request body too large (limit ${maxBytes} bytes)` };
+    }
+    chunks.push(buf);
+  }
+
+  if (chunks.length === 0) {
+    return { ok: true, data: {} };
+  }
+
+  const raw = Buffer.concat(chunks).toString("utf8");
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { ok: false, status: 400, error: "Request body is not valid JSON" };
+  }
+
+  return { ok: true, data: isRecord(parsed) ? parsed : {} };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

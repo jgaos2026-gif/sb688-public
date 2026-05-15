@@ -1,6 +1,10 @@
 import { hashOf } from "../utils/hash";
 
-const MAX_CONTENT_LENGTH = 10 * 1024 * 1024; // 10 MB (base64 characters)
+/**
+ * Maximum upload size in UTF-8 bytes. Content is always treated as plain UTF-8 text;
+ * callers must decode any binary/base64 representation before passing it here.
+ */
+const MAX_CONTENT_BYTES = 10 * 1024 * 1024; // 10 MB
 
 const ALLOWED_CONTENT_TYPES = new Set([
   "text/plain",
@@ -18,8 +22,9 @@ export interface SentinelScanResult {
 
 /**
  * UploadSentinel scans incoming files for anomalies before they are accepted
- * into the brick file-system. It enforces size limits, content-type allow-list,
- * safe filename checks, and replay-attack detection via content-hash deduplication.
+ * into the brick file-system. It enforces size limits (in UTF-8 bytes),
+ * content-type allow-list, safe filename checks, and replay-attack detection
+ * via content-hash deduplication.
  */
 export class UploadSentinel {
   private readonly seenHashes = new Set<string>();
@@ -27,12 +32,14 @@ export class UploadSentinel {
   scan(filename: string, content: string, contentType: string): SentinelScanResult {
     const anomalies: string[] = [];
 
-    if (content.length === 0) {
+    const byteLength = Buffer.byteLength(content, "utf8");
+
+    if (byteLength === 0) {
       anomalies.push("empty_content");
     }
 
-    if (content.length > MAX_CONTENT_LENGTH) {
-      anomalies.push(`content_too_large:${content.length}`);
+    if (byteLength > MAX_CONTENT_BYTES) {
+      anomalies.push(`content_too_large:${byteLength}`);
     }
 
     if (filename.includes("..") || filename.includes("/") || filename.includes("\\")) {
