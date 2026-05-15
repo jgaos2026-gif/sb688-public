@@ -1,23 +1,36 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { IntegratedSystem } from "../system/IntegratedSystem";
 import { AgentBrick } from "../agent/AgentBrick";
+import { readServerRuntimeConfig } from "./config";
+import { logServerEvent } from "./logger";
 
 export interface SystemServerOptions {
   readonly host?: string;
   readonly port?: number;
   readonly seedState?: Readonly<Record<string, unknown>>;
+  readonly uploadMaxBodyBytes?: number;
+  readonly gracefulShutdownTimeoutMs?: number;
 }
 
 export function startSystemServer(options: SystemServerOptions = {}): void {
-  const host = options.host ?? "127.0.0.1";
-  const port = options.port ?? 6890;
+  const config = readServerRuntimeConfig(process.env, {
+    host: options.host,
+    port: options.port,
+    uploadMaxBodyBytes: options.uploadMaxBodyBytes,
+    gracefulShutdownTimeoutMs: options.gracefulShutdownTimeoutMs
+  });
   const system = new IntegratedSystem({ seedState: options.seedState });
   const agent = new AgentBrick();
+  const startedAtMs = Date.now();
 
   const server = createServer(async (request, response) => {
     try {
-      await routeRequest(system, agent, request, response);
+      await routeRequest(system, agent, request, response, config.uploadMaxBodyBytes, startedAtMs, config.environment);
     } catch (error) {
+      logServerEvent("error", "request.unhandled", {
+        message: error instanceof Error ? error.message : "unknown",
+        stack: error instanceof Error ? error.stack : undefined
+      });
       sendJson(response, 500, {
         ok: false,
         error: error instanceof Error ? error.message : "Unhandled server error"
@@ -25,16 +38,25 @@ export function startSystemServer(options: SystemServerOptions = {}): void {
     }
   });
 
-  server.listen(port, host, () => {
-    process.stdout.write(`SB689 complete system live on http://${host}:${port}\n`);
+  server.listen(config.port, config.host, () => {
+    logServerEvent("info", "server.started", {
+      host: config.host,
+      port: config.port,
+      environment: config.environment
+    });
   });
+
+  registerShutdownHandlers(server, config.gracefulShutdownTimeoutMs);
 }
 
 async function routeRequest(
   system: IntegratedSystem,
   agent: AgentBrick,
   request: IncomingMessage,
-  response: ServerResponse
+  response: ServerResponse,
+  uploadMaxBodyBytes: number,
+  startedAtMs: number,
+  environment: "development" | "staging" | "production"
 ): Promise<void> {
   const method = request.method ?? "GET";
   const url = request.url ?? "/";
@@ -58,8 +80,23 @@ async function routeRequest(
     sendJson(response, 200, {
       ok: true,
       service: "SB689 complete system",
+      environment,
+      uptimeSeconds: Math.floor((Date.now() - startedAtMs) / 1000),
       status: system.status().status,
       ledgerValid: system.ledgerValid()
+    });
+    return;
+  }
+
+  if (method === "GET" && url === "/api/ready") {
+    const status = system.status().status;
+    const ledgerValid = system.ledgerValid();
+    const ready = ledgerValid && status === "SB689_READY";
+    sendJson(response, ready ? 200 : 503, {
+      ok: ready,
+      service: "SB689 complete system",
+      status,
+      ledgerValid
     });
     return;
   }
@@ -70,6 +107,11 @@ async function routeRequest(
       ledgerValid: system.ledgerValid(),
       entries: system.ledgerEntries()
     });
+    return;
+  }
+
+  if (method === "GET" && url === "/api/ledger/export") {
+    sendJsonLines(response, 200, system.exportLedgerJsonLines());
     return;
   }
 
@@ -186,10 +228,8 @@ async function routeRequest(
     return;
   }
 
-  const UPLOAD_MAX_BODY_BYTES = 11 * 1024 * 1024; // 10 MB content + overhead
-
   if (method === "POST" && url === "/api/upload") {
-    const body = await readJsonBodyWithLimit(request, UPLOAD_MAX_BODY_BYTES);
+    const body = await readJsonBodyWithLimit(request, uploadMaxBodyBytes);
     if (body === null) {
       sendJson(response, 413, { ok: false, error: "Request body too large." });
       return;
@@ -213,7 +253,7 @@ async function routeRequest(
   }
 
   if (method === "POST" && url === "/api/upload/dispatch") {
-    const body = await readJsonBodyWithLimit(request, UPLOAD_MAX_BODY_BYTES);
+    const body = await readJsonBodyWithLimit(request, uploadMaxBodyBytes);
     if (body === null) {
       sendJson(response, 413, { ok: false, error: "Request body too large." });
       return;
@@ -320,6 +360,45 @@ function sendJson(response: ServerResponse, statusCode: number, body: unknown): 
     "Cache-Control": "no-store"
   });
   response.end(JSON.stringify(body, null, 2));
+}
+
+function sendJsonLines(response: ServerResponse, statusCode: number, body: string): void {
+  response.writeHead(statusCode, {
+    "Content-Type": "application/x-ndjson; charset=utf-8",
+    "Cache-Control": "no-store"
+  });
+  response.end(body);
+}
+
+function registerShutdownHandlers(server: ReturnType<typeof createServer>, timeoutMs: number): void {
+  let shuttingDown = false;
+
+  const shutdown = (signal: NodeJS.Signals): void => {
+    if (shuttingDown) {
+      return;
+    }
+    shuttingDown = true;
+    logServerEvent("info", "server.shutdown.begin", { signal, timeoutMs });
+
+    const forceTimer = setTimeout(() => {
+      logServerEvent("error", "server.shutdown.timeout", { signal, timeoutMs });
+      process.exit(1);
+    }, timeoutMs);
+
+    server.close((error) => {
+      clearTimeout(forceTimer);
+      if (error) {
+        logServerEvent("error", "server.shutdown.error", { signal, message: error.message });
+        process.exit(1);
+        return;
+      }
+      logServerEvent("info", "server.shutdown.complete", { signal });
+      process.exit(0);
+    });
+  };
+
+  process.on("SIGINT", () => shutdown("SIGINT"));
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
 const INDEX_HTML = `<!doctype html>

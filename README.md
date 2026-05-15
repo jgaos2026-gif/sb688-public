@@ -93,7 +93,7 @@ docs/           Whitepaper, architecture, attribution, governance, security, pre
 ## Commands
 
 ```bash
-npm install
+npm ci
 npm run build      # tsc -p tsconfig.json
 npm test           # build + node --test dist/test/**/*.test.js
 npm run demo       # build + node dist/demo/runDemo.js
@@ -149,6 +149,11 @@ const handshake = omega.connectToStitch();
 - [docs/ANDROID.md](docs/ANDROID.md) — Android build & deployment
 - [docs/SECURITY.md](docs/SECURITY.md) — what is and is not claimed
 - [docs/GOVERNANCE.md](docs/GOVERNANCE.md) — change classes, PR rules
+- [docs/PRODUCTION_SCOPE.md](docs/PRODUCTION_SCOPE.md) — production boundary and SLO scope
+- [docs/RELEASE_GATES.md](docs/RELEASE_GATES.md) — required merge/release checks
+- [docs/INCIDENT_RESPONSE.md](docs/INCIDENT_RESPONSE.md) — vulnerability and incident handling
+- [docs/OPERATIONS_RUNBOOK.md](docs/OPERATIONS_RUNBOOK.md) — deployment and operational runbook
+- [docs/PRODUCTION_VERIFICATION.md](docs/PRODUCTION_VERIFICATION.md) — smoke/chaos/perf release checks
 - [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md) — concept attribution
 - [docs/PRESS_KIT.md](docs/PRESS_KIT.md) — public observer kit
 - [CHANGELOG.md](CHANGELOG.md), [CONTRIBUTING.md](CONTRIBUTING.md),

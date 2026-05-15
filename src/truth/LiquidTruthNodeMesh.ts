@@ -28,7 +28,7 @@ export class LiquidTruthNodeMesh {
       },
       {
         nodeId: "truth.spine.signature",
-        passed: permit.approved === true && permit.spineSignature.startsWith("fnv1a:"),
+        passed: permit.approved === true && permit.spineSignature.startsWith("sha256:"),
         confidence: 0.98,
         message: "Spine permit is signed and approved."
       },

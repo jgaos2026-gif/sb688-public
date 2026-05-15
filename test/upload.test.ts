@@ -13,7 +13,7 @@ test("UploadSentinel accepts a valid file", () => {
   const result = sentinel.scan("invoice.json", '{"amount":100}', "application/json");
   assert.equal(result.clean, true);
   assert.equal(result.anomalies.length, 0);
-  assert.ok(result.contentHash.startsWith("fnv1a:"));
+  assert.ok(result.contentHash.startsWith("sha256:"));
 });
 
 test("UploadSentinel rejects empty content", () => {
@@ -58,7 +58,7 @@ test("FileUploadManager accepts a valid upload and records it in the audit ledge
   assert.equal(result.accepted, true);
   assert.equal(result.filename, "report.txt");
   assert.equal(result.anomalies.length, 0);
-  assert.ok(result.contentHash.startsWith("fnv1a:"));
+  assert.ok(result.contentHash.startsWith("sha256:"));
   assert.equal(ledger.verifyChain(), true);
   assert.ok(ledger.entries().length > 0);
 });
