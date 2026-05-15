@@ -78,6 +78,10 @@ export class IntegratedSystem {
     return this.ledger.entries();
   }
 
+  exportLedgerJsonLines(): string {
+    return this.ledger.entriesJsonLines();
+  }
+
   ledgerValid(): boolean {
     return this.ledger.verifyChain();
   }

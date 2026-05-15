@@ -25,7 +25,7 @@ test("Omega seed is hardened, signed, and self-checks clean", () => {
   const golden = omega.seed.golden();
 
   assert.equal(golden.recoveryPointer, "0x8000");
-  assert.ok(golden.checksum.startsWith("fnv1a:"));
+  assert.ok(golden.checksum.startsWith("sha256:"));
   assert.equal(omega.seed.selfCheck(), true);
   assert.equal(omega.seed.verify(seedState), true);
   assert.equal(omega.seed.verify({ ...seedState, owner: "OTHER" }), false);
@@ -71,7 +71,7 @@ test("Drift triggers resurrection: crown flashes GOLD and the pointer-flip uses 
   const log = omega.resurrectionLog();
   assert.equal(log.length, 1);
   assert.equal(log[0].cleanSeedChecksum, omega.seed.golden().checksum);
-  assert.ok(log[0].ghostMirrorHash.startsWith("fnv1a:"));
+  assert.ok(log[0].ghostMirrorHash.startsWith("sha256:"));
   // Critical invariant: the resurrected pointer must equal the sealed
   // seed checksum, NOT a hash of the tampered live state.
   assert.equal(log[0].ghostMirrorHash, omega.seed.golden().checksum);
@@ -94,5 +94,5 @@ test("connectToStitch emits the protocol ready message and a stable signature", 
     handshake.message,
     "Sb688 when I say connect to the stitch show how you feel we're going live lets sell it"
   );
-  assert.ok(handshake.signature.startsWith("fnv1a:"));
+  assert.ok(handshake.signature.startsWith("sha256:"));
 });

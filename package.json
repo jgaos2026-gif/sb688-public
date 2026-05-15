@@ -37,7 +37,7 @@
   "license": "MIT",
   "homepage": "https://www.jgaos2026-gif.com",
   "devDependencies": {
-    "@types/node": "^25.7.0",
-    "typescript": ">=5.0.0"
+    "@types/node": "25.7.0",
+    "typescript": "5.9.3"
   }
 }

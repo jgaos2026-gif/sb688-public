@@ -26,14 +26,14 @@
 
 - Perfect security.
 - Compliance certification.
-- Cryptographic guarantees beyond the (public) FNV-1a fingerprinting
-  used for chain detection. Production deployments must replace this
-  with a domain-appropriate cryptographic hash and signing scheme,
-  managed by the operator's HSM/KMS — *out of scope for this
-  reference implementation*.
+- Cryptographic guarantees beyond public SHA-256 hash-chaining and
+  signature checks in this reference implementation. Production
+  deployments should still use operator-managed key custody and
+  signing policies (HSM/KMS-backed operations).
 
 ## Reporting
 
 Vulnerability reports: contact the Architect through the channel
 listed on https://www.jgaos2026-gif.com — do **not** open public
-issues for security findings.
+issues for security findings. See `docs/INCIDENT_RESPONSE.md` for
+severity handling and release-blocking policy.

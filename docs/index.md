@@ -35,6 +35,11 @@ SB689 OMEGA stitches two layers into one resilience runtime:
 | [Whitepaper](WHITEPAPER) | Protocol, architecture & evidence labels |
 | [Architecture](ARCHITECTURE) | Module map, layer contracts |
 | [Security](SECURITY) | What is and is not claimed |
+| [Production Scope](PRODUCTION_SCOPE) | In-scope systems, environments, SLO/security baseline |
+| [Release Gates](RELEASE_GATES) | Mandatory checks and branch-protection requirements |
+| [Incident Response](INCIDENT_RESPONSE) | Vulnerability intake, severity, and response policy |
+| [Operations Runbook](OPERATIONS_RUNBOOK) | Env config, health/readiness, deployment and drills |
+| [Production Verification](PRODUCTION_VERIFICATION) | Smoke, chaos, performance, and go/no-go checklist |
 | [Governance](GOVERNANCE) | Change classes, PR rules, roles |
 | [Attribution](ATTRIBUTION) | Concept attribution |
 | [Press Kit](PRESS_KIT) | Public observer kit |

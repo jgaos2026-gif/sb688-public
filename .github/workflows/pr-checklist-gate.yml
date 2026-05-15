@@ -1,0 +1,50 @@
+name: pr-checklist-gate
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  require-pr-checklist:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate required PR checklist items are checked
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          node - <<'NODE'
+          const body = process.env.PR_BODY || "";
+          const required = [
+            "npm run build passes locally",
+            "npm test passes locally",
+            "npm run demo runs end-to-end without errors",
+            "No private / proprietary content added",
+            "Brain remains adapter-only",
+            "Audit ledger format remains append-only and hash-chained",
+            "Evidence labels in `docs/WHITEPAPER.md` were not weakened"
+          ];
+
+          if (!body.trim()) {
+            console.error("PR body is empty; required checklist items are missing.");
+            process.exit(1);
+          }
+
+          const missing = required.filter((item) => {
+            const escaped = item.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const checked = new RegExp(`-\\s*\\[x\\]\\s*.*${escaped}`, "i");
+            return !checked.test(body);
+          });
+
+          if (missing.length > 0) {
+            console.error("Missing checked PR checklist items:");
+            for (const item of missing) console.error(` - ${item}`);
+            process.exit(1);
+          }
+
+          console.log("PR checklist gate passed.");
+          NODE
