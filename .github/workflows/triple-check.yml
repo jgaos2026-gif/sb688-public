@@ -12,7 +12,7 @@ jobs:
   verify-three-sources:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Validate three-source public alignment
         run: |
           python - <<'PY'
