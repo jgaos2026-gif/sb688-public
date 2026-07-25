@@ -31,6 +31,21 @@ An enterprise OS for bold automation and ethical scalability:
 
 ---
 
+## The Oasis — Modular Business Clip Bricks
+
+**The Oasis** is the modular business deployment framework built on the Clip Brick architecture.
+Each business unit connects as a numbered Clip Brick, operating independently while remaining
+stitched into the shared runtime and governance layer.
+
+| Brick | Business | Status |
+|-------|----------|--------|
+| **Brick 1** | **Jays Graphic Arts** | Active |
+
+Additional bricks are onboarded through the standard Clip Brick provisioning process
+and must pass SB688 verification before joining the stitch.
+
+---
+
 ## Run Instructions:
 1. Clone this repository.
 
