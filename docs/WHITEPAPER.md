@@ -1,6 +1,6 @@
 # SB689 OMEGA — Sovereign Stitch
 ### A Resilience Runtime by John Arenz (J.G.A.)
-### Version 1.1.1 · April 2026
+### Version 1.1.1
 
 > **Philosophy:** *Elegance with Consequences.*
 > **Objective:** *Duty Impossible — Sub-millisecond Resurrection.*

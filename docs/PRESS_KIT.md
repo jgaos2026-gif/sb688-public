@@ -7,7 +7,7 @@ https://www.jgaos2026-gif.com.
 
 **SB689 OMEGA is live — v1.1.1.**
 
-By **John Arenz · J.G.A.** · April 30, 2026
+By **John Arenz · J.G.A.**
 
 The SB688 National Resilience Council architecture and the SB689
 Braided Runtime are now stitched together into a single resilience
