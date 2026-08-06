@@ -22,3 +22,7 @@ export * from "./upload/FileUploadManager";
 export * from "./omega";
 export * from "./agent";
 export * from "./physics/OhmsLaw";
+export * from "./phoenix";
+export * from "./triad";
+export * from "./paired";
+export * from "./truth/BctVerifier";

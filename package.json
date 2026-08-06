@@ -17,6 +17,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/test/*.test.js",
+    "benchmark": "npm run build && node dist/benchmark/run.js",
     "demo": "npm run build && node dist/demo/runDemo.js",
     "system": "npm run build && node dist/demo/runSystem.js",
     "system:dev": "npm run system",
