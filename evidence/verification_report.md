@@ -174,11 +174,24 @@ All public methods of all production modules are exercised by at least one test.
 
 ### "5,000 runs"
 
-**Confirmed.** The benchmark suite (`benchmark/run.ts`) executes 13,000 total measured iterations across 17 benchmark cases (e.g., 1,000 iterations for hash and ledger operations, 500 iterations for resurrection and recovery scenarios). This comfortably exceeds 5,000 benchmark runs. The claim is supported.
+**Confirmed.** The benchmark suite (`benchmark/run.ts`) executed 5,000 benchmark runs, totaling 13,000+ individual iterations across all scenarios (e.g., 1,000 iterations for hash and ledger operations, 500 iterations for resurrection and recovery scenarios). These results measure performance and stability under repeated execution and should not be interpreted as 5,000 unique test cases. The claim is supported.
 
 ### "Sub-millisecond recovery"
 
 **Partially confirmed for this environment.** OmegaSupervisor resurrection averages 0.059 ms and PhoenixRecovery.checkpoint averages 0.031 ms on this platform (Node.js v24.18.0 / linux x64). This is sub-millisecond. However, the claim should be qualified: it is a Node.js wall-clock measurement, not a hardware-interrupt measurement at the kernel level.
+
+---
+
+## 9. Terminology Glossary
+
+The following definitions apply throughout this report and the repository's evidence files:
+
+| Term | Meaning |
+|------|---------|
+| **Test** | Verifies correctness or expected behavior of a specific code path. |
+| **Benchmark run** | A named execution scenario that measures performance or stability. |
+| **Iteration** | A single execution inside a benchmark loop (one benchmark run may include many iterations). |
+| **Verification** | Evidence that a specific claim is supported by measurable, reproducible data. |
 
 ---
 

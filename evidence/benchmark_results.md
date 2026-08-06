@@ -7,6 +7,8 @@
 
 All numbers are real measurements. Warm-up passes excluded. See `benchmark_results.json` for full raw data.
 
+> **Note:** The 17 benchmark cases in this suite constitute **5,000+ benchmark runs** (named execution scenarios), executing **13,000+ total iterations** (individual loop executions). These figures measure performance and stability and should not be interpreted as 5,000 unique test cases.
+
 ---
 
 ## Results Table
