@@ -37,9 +37,15 @@ export class SentinelLayer {
   private readonly clock: Clock;
   /** Running chain-head hash (advances with every `observe()` call). */
   private chainHead = "SENTINEL_GENESIS";
+  /**
+   * The chain hash that precedes the oldest retained metric.
+   * Updated when older entries are evicted so `_verifyChain()` can start from
+   * the correct base rather than always replaying from SENTINEL_GENESIS.
+   */
+  private chainBase = "SENTINEL_GENESIS";
 
   constructor(opts?: { readonly windowSize?: number; readonly clock?: Clock }) {
-    this.windowSize = opts?.windowSize ?? 10;
+    this.windowSize = Math.max(1, Math.floor(opts?.windowSize ?? 10));
     this.clock = opts?.clock ?? systemClock;
   }
 
@@ -60,8 +66,15 @@ export class SentinelLayer {
     this.metrics.push(metric);
 
     // Keep a bounded ring (2× window so history is available for diagnostics).
-    if (this.metrics.length > this.windowSize * 2) {
-      this.metrics.splice(0, this.metrics.length - this.windowSize * 2);
+    const cap = this.windowSize * 2;
+    if (this.metrics.length > cap) {
+      const evict = this.metrics.length - cap;
+      // Advance chainBase past the evicted entries so _verifyChain() can still
+      // start from the correct predecessor of the oldest retained metric.
+      for (let i = 0; i < evict; i++) {
+        this.chainBase = hashOf(this.metrics[i]);
+      }
+      this.metrics.splice(0, evict);
     }
   }
 
@@ -111,7 +124,7 @@ export class SentinelLayer {
 
   /** FNV-1a hash of the entire metric chain for external tamper verification. */
   integrityHash(): string {
-    return hashOf(this.metrics);
+    return SentinelLayer._fnv1a(this.metrics);
   }
 
   /** Full sentinel status snapshot. */
@@ -125,6 +138,17 @@ export class SentinelLayer {
   }
 
   // ── private helpers ────────────────────────────────────────────────────────
+
+  /** Simple FNV-1a 32-bit hash over a JSON serialization, prefixed "fnv1a:". */
+  private static _fnv1a(value: unknown): string {
+    const str = JSON.stringify(value) ?? "";
+    let h = 0x811c9dc5;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = (Math.imul(h, 0x01000193) >>> 0);
+    }
+    return `fnv1a:${h.toString(16).padStart(8, "0")}`;
+  }
 
   private _classify(
     breachRate: number,
@@ -153,8 +177,13 @@ export class SentinelLayer {
         return `Breach rate ${(breachRate * 100).toFixed(1)}% exceeds baseline; increase observation cadence.`;
       case "ESCALATE":
         return `Persistent faults detected (rate ${(breachRate * 100).toFixed(1)}%); deeper healing protocols required.`;
-      case "QUARANTINE":
-        return `Majority-breach window (${consecutiveBreaches} consecutive); isolate affected bricks and restore from clean seed.`;
+      case "QUARANTINE": {
+        // Distinguish consecutive-saturation path from aggregate breach-rate path.
+        if (consecutiveBreaches >= 1) {
+          return `Majority-breach window (${consecutiveBreaches} consecutive); isolate affected bricks and restore from clean seed.`;
+        }
+        return `Majority-breach rate (${(breachRate * 100).toFixed(1)}%); isolate affected bricks and restore from clean seed.`;
+      }
       case "FAILSAFE":
         return `Saturation breach (rate ${(breachRate * 100).toFixed(1)}%, ${consecutiveBreaches} consecutive); activate fail-safe mode immediately.`;
     }
@@ -162,10 +191,12 @@ export class SentinelLayer {
 
   /**
    * Replay the metric hash-chain to detect any post-hoc mutation of the log.
-   * Returns true when the chain is intact.
+   * Starts from `chainBase` (the predecessor of the oldest retained entry) so
+   * verification remains correct even after the bounded ring has evicted older
+   * entries.
    */
   private _verifyChain(): boolean {
-    let current = "SENTINEL_GENESIS";
+    let current = this.chainBase;
     for (const metric of this.metrics) {
       if (metric.prevHash !== current) return false;
       current = hashOf(metric);

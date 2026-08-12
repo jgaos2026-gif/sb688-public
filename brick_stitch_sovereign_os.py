@@ -492,6 +492,9 @@ class SentinelMonitor:
         self.clock = clock
         self._records: List[Dict] = []
         self._chain_hash: str = "SENTINEL_GENESIS"
+        # Predecessor hash of the oldest retained record; advances on eviction
+        # so self_check() can verify the truncated chain without full replay.
+        self._chain_base: str = "SENTINEL_GENESIS"
 
     # ---- public API ----
 
@@ -513,6 +516,15 @@ class SentinelMonitor:
         }
         self._chain_hash = hash_blob(stable_json(record))
         self._records.append(record)
+
+        # Cap storage at 2×WINDOW_SIZE; advance _chain_base past evicted entries
+        # so _verify_chain() can start from the correct predecessor.
+        cap = self.WINDOW_SIZE * 2
+        if len(self._records) > cap:
+            evict = len(self._records) - cap
+            for i in range(evict):
+                self._chain_base = hash_blob(stable_json(self._records[i]))
+            del self._records[:evict]
 
     def suggest_strategy(self, brick_name: str, fault_type: str) -> str:  # noqa: ARG002
         """
@@ -573,7 +585,7 @@ class SentinelMonitor:
         return window
 
     def _verify_chain(self) -> bool:
-        current_hash = "SENTINEL_GENESIS"
+        current_hash = self._chain_base
         for record in self._records:
             if record.get("prev_hash") != current_hash:
                 return False
