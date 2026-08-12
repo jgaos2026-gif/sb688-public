@@ -15,6 +15,7 @@ export * from "./quantum/QuantumDistributionValidator";
 export * from "./failure/FailureManager";
 export * from "./runtime/BraidedRuntime";
 export * from "./system/IntegratedSystem";
+export * from "./system/UniversalSovereignIntegrityFabric";
 export * from "./server/SystemServer";
 export * from "./upload/contracts";
 export * from "./upload/UploadSentinel";

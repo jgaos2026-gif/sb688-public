@@ -45,11 +45,35 @@ Fail state: `kill → activate → re-stitch → signal`.
 - The OMEGA bricks never call into the Brain. The Brain remains
   adapter-only at all times.
 
+## Layer 3 · Universal Sovereign Integrity Fabric (tri-sovereign operations)
+
+```
+                 Universal Fabric
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+    Sovereign 1    Sovereign 2    Sovereign 3
+        │              │              │
+   Runtime + OMEGA  Runtime + OMEGA Runtime + OMEGA
+        │              │              │
+   Triad + Phoenix  Triad + Phoenix Triad + Phoenix
+```
+
+- Runs three independent sovereign stacks in one coordinated drill path.
+- Offensive simulation injects adversarial tamper, upload-path abuse, and
+  hostile filesystem probes.
+- Defensive path enforces `detect → isolate → rollback/heal → re-verify`.
+- Recovery always restores from verified checkpoints before trust promotion.
+- Hardened drills include hostile industry profiles (cloud, banking,
+  healthcare, manufacturing, government) plus severe environments
+  (space, deep sea) with pulse-loss resurrection.
+
 ## Files
 
 | Path | Role |
 |------|------|
 | [src/runtime/BraidedRuntime.ts](sb689-braided-runtime/src/runtime/BraidedRuntime.ts) | Layer 1 orchestrator |
+| [src/system/UniversalSovereignIntegrityFabric.ts](sb689-braided-runtime/src/system/UniversalSovereignIntegrityFabric.ts) | Layer 3 tri-sovereign orchestration |
 | [src/spine/SpineGovernor.ts](sb689-braided-runtime/src/spine/SpineGovernor.ts) | Spine admission |
 | [src/truth/LiquidTruthNodeMesh.ts](sb689-braided-runtime/src/truth/LiquidTruthNodeMesh.ts) | Truth verification |
 | [src/conscious/ConsciousBrick.ts](sb689-braided-runtime/src/conscious/ConsciousBrick.ts) | Goal/ethics/consequence |
