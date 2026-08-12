@@ -590,14 +590,10 @@ class SovereignOS:
         self.spine = Spine(self.clock)
         self.healing: Optional[HealingLayer] = None
         self.operations: Optional[OperationsLayer] = None
-<<<<<<< HEAD
-        # Sentinel persists across setup_system() calls so it accumulates
+        # SentinelMonitor persists across setup_system() calls so it accumulates
         # knowledge across the full test suite run.
-        self.sentinel = SentinelMonitor(self.clock)
-=======
-        self.sentinel: Optional[SentinelLayer] = None
+        self.sentinel_monitor = SentinelMonitor(self.clock)
         self.upload_manager: Optional[FileUploadManager] = None
->>>>>>> origin/main
         self.setup_system()
 
     def setup_system(self) -> None:
@@ -663,7 +659,7 @@ class SovereignOS:
         if fault_type == "spine_tamper":
             recovered = self.healing.recover_spine()
             ok = self.operations.run_cycle() if recovered else False
-            self.sentinel.observe("spine", "spine_tamper", ok, "system")
+            self.sentinel_monitor.observe("spine", "spine_tamper", ok, "system")
             return ok
 
         if fault_type == "heal_layer_fault":
@@ -674,14 +670,14 @@ class SovereignOS:
                 self.bricks[brick_name].state.pop("corrupted", None)
                 self.bricks[brick_name].state.pop("crash_flag", None)
             ok = self.operations.run_cycle()
-            self.sentinel.observe(brick_name or "system", "heal_layer_fault", ok, "system")
+            self.sentinel_monitor.observe(brick_name or "system", "heal_layer_fault", ok, "system")
             return ok
 
         if brick_name is None:
             return False
 
         # Consult sentinel for an adaptive healing strategy based on history.
-        strategy = self.sentinel.suggest_strategy(brick_name, fault_type)
+        strategy = self.sentinel_monitor.suggest_strategy(brick_name, fault_type)
 
         if strategy == "force_rollback":
             last_good = self.spine.get_last_good(brick_name)
@@ -695,13 +691,13 @@ class SovereignOS:
                     )
                 downstream_ok = self.healing.rerun_downstream(brick_name)
                 ok = self.operations.run_cycle() if downstream_ok else False
-                self.sentinel.observe(brick_name, fault_type, ok, strategy)
+                self.sentinel_monitor.observe(brick_name, fault_type, ok, strategy)
                 return ok
             # Fall through to standard path if no snapshot is available.
 
         healed = self.healing.heal(brick_name, fault_type)
         if not healed:
-            self.sentinel.observe(brick_name, fault_type, False, strategy)
+            self.sentinel_monitor.observe(brick_name, fault_type, False, strategy)
             return False
 
         self.bricks[brick_name].state.pop("corrupted", None)
@@ -720,7 +716,7 @@ class SovereignOS:
         downstream_ok = self.healing.rerun_downstream(brick_name)
         cycle_ok = self.operations.run_cycle()
         ok = healed and downstream_ok and cycle_ok
-        self.sentinel.observe(brick_name, fault_type, ok, strategy)
+        self.sentinel_monitor.observe(brick_name, fault_type, ok, strategy)
         return ok
 
     # ---------------- Validation ----------------
@@ -731,7 +727,7 @@ class SovereignOS:
         no_corruption = not any(brick.state.get("corrupted") for brick in self.bricks.values())
         no_mid_update = not any(brick.state.get("status") == "updating" for brick in self.bricks.values())
         dag_ok = nx.is_directed_acyclic_graph(self.dep_graph)
-        sentinel_ok = self.sentinel.self_check()
+        sentinel_ok = self.sentinel_monitor.self_check()
         details = {
             "health": health,
             "chain_ok": chain_ok,
@@ -884,13 +880,9 @@ class SovereignOS:
             ("5. Cascading Dependency Failure", "core", "dependency_failure"),
             ("6. Persistent Storage Corruption", "fs", "storage_corrupt"),
             ("7. Update Failure Mid-Install", "fs", "partial_update"),
-<<<<<<< HEAD
-            ("8. Sentinel Self-Awareness Validation", None, None),
-=======
             ("8. Sentinel Watches Crash Fault", "user_app", "runtime_crash"),
             ("9. Sentinel Watches Spine Tamper", None, "spine_tamper"),
             ("10. Sentinel Adaptive Threshold", "driver_net", "corrupt"),
->>>>>>> origin/main
         ]
 
         all_passed = True
@@ -908,16 +900,14 @@ class SovereignOS:
                     print(f"  details={report['details']}")
             all_passed = all_passed and passed
 
-<<<<<<< HEAD
         if verbose:
-            diagnosis = self.sentinel.diagnose()
+            diagnosis = self.sentinel_monitor.diagnose()
             repeat = diagnosis["repeat_offenders"] or "none"
             print(
                 f"\n[SENTINEL] observations={diagnosis['total_observations']} | "
                 f"repeat_offenders={repeat} | "
                 f"chain_intact={diagnosis['chain_integrity']}"
             )
-=======
         if include_extreme:
             passed, report = self.run_extreme_environment_simulation(months=extreme_months, verbose=verbose)
             if verbose:
@@ -930,7 +920,6 @@ class SovereignOS:
                 if not passed:
                     print(f"  details={report.get('details')}")
             all_passed = all_passed and passed
->>>>>>> origin/main
         return all_passed
 
     def run_all_tests_once(self, verbose: bool = True) -> bool:
