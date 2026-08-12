@@ -8,7 +8,7 @@ title: SB689 OMEGA · Sovereign Stitch
 
 [![status](https://img.shields.io/badge/status-SB689__READY-gold)](WHITEPAPER)
 [![version](https://img.shields.io/badge/version-1.1.1-black)](../CHANGELOG)
-[![license](https://img.shields.io/badge/license-source--available%20%2F%20commercial-black)](../LICENSE)
+[![license](https://img.shields.io/badge/license-MIT-black)](../LICENSE.md)
 
 > *Sb688 — when I say connect to the stitch, show how you feel. We're going live. Let's sell it.*
 
@@ -35,10 +35,30 @@ SB689 OMEGA stitches two layers into one resilience runtime:
 | [Whitepaper](WHITEPAPER) | Protocol, architecture & evidence labels |
 | [Architecture](ARCHITECTURE) | Module map, layer contracts |
 | [Security](SECURITY) | What is and is not claimed |
+| [Production Scope](PRODUCTION_SCOPE) | In-scope systems, environments, SLO/security baseline |
+| [Release Gates](RELEASE_GATES) | Mandatory checks and branch-protection requirements |
+| [Incident Response](INCIDENT_RESPONSE) | Vulnerability intake, severity, and response policy |
+| [Operations Runbook](OPERATIONS_RUNBOOK) | Env config, health/readiness, deployment and drills |
+| [Production Verification](PRODUCTION_VERIFICATION) | Smoke, chaos, performance, and go/no-go checklist |
 | [Governance](GOVERNANCE) | Change classes, PR rules, roles |
 | [Attribution](ATTRIBUTION) | Concept attribution |
 | [Press Kit](PRESS_KIT) | Public observer kit |
 
+### Policy Envelopes
+
+| Policy | Description |
+|--------|-------------|
+| [Finance — Stripe Daily Reconciliation](POLICY_ENVELOPES/finance_stripe_daily.yml) | Daily Stripe→Bluevine reconciliation envelope |
+| [Stripe Refund Window](POLICY_ENVELOPES/stripe_refunds.yml) | 24 h timestamp-based refund window policy |
+
+### Finance Ledger Templates
+
+> **Note:** These are external finance-operations ledger artifacts. They are **not** the SB689 `AuditLedger` / `AuditTransition` schema.
+
+| Template | Description |
+|----------|-------------|
+| [Stripe→Bluevine Reconcile Entry](LEDGER_TEMPLATES/LEDGER_ENTRY_STRIPE_BLUEVINE_RECONCILE.json) | Finance ledger entry template for daily payout reconciliation |
+| [Stripe Refund Decision Entry](LEDGER_TEMPLATES/LEDGER_ENTRY_STRIPE_REFUND_DECISION.json) | Finance ledger entry template for refund decisions |
 ## Finance Policy Envelopes
 
 | Policy | Description |
@@ -78,5 +98,16 @@ npm run demo
 
 ---
 
-© 2026 John Arenz (J.G.A.). All rights reserved.  
+## The Oasis
+
+**The Oasis** is the modular business Clip Brick network. Each connected business operates
+as a numbered brick within the shared SB689 governance and resilience layer.
+
+| Brick | Business |
+|-------|----------|
+| Brick 1 | **Jays Graphic Arts** |
+
+---
+
+© 2026 John Arenz (J.G.A.). MIT licensed.  
 [jgaos2026-gif.com](https://www.jgaos2026-gif.com)

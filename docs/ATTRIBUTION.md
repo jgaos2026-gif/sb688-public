@@ -26,4 +26,4 @@ heuristics, weights, brain content, signing keys, and production
 adapters are **not** included and remain the exclusive intellectual
 property of John Arenz.
 
-© 2026 John Arenz. All rights reserved.
+© 2026 John Arenz. Released under the MIT License.

@@ -7,7 +7,7 @@ https://www.jgaos2026-gif.com.
 
 **SB689 OMEGA is live — v1.1.1.**
 
-By **John Arenz · J.G.A.** · April 30, 2026
+By **John Arenz · J.G.A.**
 
 The SB688 National Resilience Council architecture and the SB689
 Braided Runtime are now stitched together into a single resilience
@@ -25,8 +25,7 @@ What ships in v1.1.1:
   about runtime state.
 - **Evidence-labeled white paper** — every claim is *VERIFIED IN DEMO*,
   *MODELED HERE*, or *NOT CLAIMED YET*.
-- **Dual license** — source-available reference + commercial license
-  on request.
+- **MIT licensed** — open collaboration on the public framework.
 
 > *Sb688 — when I say connect to the stitch, show how you feel. We're
 > going live. Let's sell it.*

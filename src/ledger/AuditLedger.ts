@@ -21,6 +21,10 @@ export class AuditLedger {
     return this.store.map((entry) => Object.freeze({ ...entry }));
   }
 
+  entriesJsonLines(): string {
+    return this.store.map((entry) => JSON.stringify(entry)).join("\n");
+  }
+
   latestHash(): string {
     return this.store.length === 0 ? "GENESIS" : this.store[this.store.length - 1].hash;
   }

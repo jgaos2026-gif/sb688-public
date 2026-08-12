@@ -1,112 +1,69 @@
-# SB689 OMEGA · Sovereign Stitch
-### A resilience runtime by **John Arenz (J.G.A.)** — *Elegance with Consequences.*
+# Unified SB Mesh OS
 
-[![status](https://img.shields.io/badge/status-SB689__READY-gold)](docs/WHITEPAPER.md)
-[![license](https://img.shields.io/badge/license-source--available%20%2F%20commercial-black)](LICENSE)
-
-> *Sb688 — when I say connect to the stitch, show how you feel. We're going live. Let's sell it.*
+**Beyond Verification:** A fully autonomous, scalable, and secure business operating system prototype. Built to merge the power of **SB688 Verification Law** and **SB712 Runtime**.
 
 ---
 
-## What this is
+## Vision:
+An enterprise OS for bold automation and ethical scalability:
+- Verification-first workflows.
+- Autonomous runtime cycles.
+- Transparent proof through audit-ledgers.
+- Modular Clip Brick deployments for distributed businesses.
 
-SB689 OMEGA stitches two layers into one runtime:
+---
 
-1. **SB689 Braided Runtime** — governed request path:
-   `Spine → Truth → Conscious → Stem → Brain → Truth → Ghost → Ledger → Response`.
-2. **SB689 OMEGA · Sovereign Stitch** — resilience supervisor: four
-   hardened bricks (Seed · Ghost · Armor · Crown) bound by a signed
-   Stitch and driven by `Verify_Stitch → Mirror_State → Monitor_Drift`
-   with a `kill → activate → re-stitch → signal` fail-state.
+## Features:
+1. **SB688 Verification Law:** Ensuring ethical automation through strict data validity protocols.
+2. **SB712 Runtime:** Automating all major business cycles (customer, sales, invoicing, compliance).
+3. **Watchdog and Phoenix System:** Live system health checks and controlled checkpoint recovery.
+4. **Quarantine System:** Isolate failed data or unauthorized processes from affecting operations.
+5. **Clip Brick Modular Deployment:** Connect enterprise or satellite offices while enforcing access control.
 
-It implements the public vocabulary of the
-[SB688 National Resilience Council](https://www.jgaos2026-gif.com)
-platform — Sovereign Spine, Brick Stitch, Ghost Node, Quarantine,
-Trusted Restore, Verifiable Proof — and adds the Omega resurrection
-loop on top.
+---
 
-## Repository layout
+## Repository Structure:
+- `/src/sb688`: Verification modules and compliance law framework.
+- `/src/sb712`: Autonomous runtime covering business cycles.
+- `/docs`: Comprehensive documentation.
+- `/examples`: Demo examples for critical workflows.
+- `/tests`: Unit tests for key components.
 
-```text
-src/
-  brain/        Brain adapter (voice only — never ruler)
-  conscious/    Conscious Brick: goal / ethics / consequence
-  contracts/    Shared typed contracts
-  failure/      Failure recovery loop (detect→isolate→rollback→…)
-  ghost/        Layer-1 Ghost Node checkpoints
-  ledger/       Append-only, hash-chained Audit Ledger
-  omega/        SB689 OMEGA · Sovereign Stitch
-    SeedBrick.ts          Brick A — Golden Image, read only
-    GhostBrick.ts         Brick B — Shadow Mirror Protocol
-    ArmorBrick.ts         Brick C — Self-Healing Daemon
-    CrownBrick.ts         Brick D — Elegance UI Crown
-    SovereignStitch.ts    Signed binding chain A→B→C→D
-    OmegaSupervisor.ts    Verify_Stitch → Mirror → Monitor_Drift
-  quantum/      Probability distribution validator
-  runtime/      BraidedRuntime orchestrator
-  spine/        Sovereign Spine governance
-  stem/         Decision · Memory · Personality tri-braid
-  truth/        Liquid Truth Node Mesh
-  utils/        Stable hash + clock
+---
 
-demo/           Runnable end-to-end demo
-test/           node:test suite (core, failure, ledger, quantum, omega)
-docs/           Whitepaper, architecture, attribution, governance, security, press kit
-```
+## The Oasis — Modular Business Clip Bricks
 
-## Commands
+**The Oasis** is the modular business deployment framework built on the Clip Brick architecture.
+Each business unit connects as a numbered Clip Brick, operating independently while remaining
+stitched into the shared runtime and governance layer.
 
-```bash
-npm install
-npm run build      # tsc -p tsconfig.json
-npm test           # build + node --test dist/test/**/*.test.js
-npm run demo       # build + node dist/demo/runDemo.js
-npm run system     # build + run full backend + frontend console on :6890
-```
+| Brick | Business | Status |
+|-------|----------|--------|
+| **Brick 1** | **Jays Graphic Arts** | Active |
 
-Open `http://127.0.0.1:6890` for the complete system console.
+Additional bricks are onboarded through the standard Clip Brick provisioning process
+and must pass SB688 verification before joining the stitch.
 
-## Quick taste
+---
 
-```ts
-import { AuditLedger, BraidedRuntime, OmegaSupervisor } from "sb689-braided-runtime";
+## Run Instructions:
+1. Clone this repository.
 
-const ledger  = new AuditLedger();
-const runtime = new BraidedRuntime({ ledger });
-const omega   = new OmegaSupervisor({
-  ledger,
-  seedState: { protocol: "SB689_OMEGA", owner: "JGA" }
-});
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   npm install # For TypeScript components
+   ```
 
-const reply     = await runtime.run({ id: "1", text: "Build the SB689 path." });
-const tick      = omega.tick({ liveState: { protocol: "SB689_OMEGA", owner: "JGA" }, pulseAlive: true });
-const handshake = omega.connectToStitch();
-```
+3. Configure `.env`:
+   ```bash
+   cp .env.example .env
+   ```
 
-## Documents
+4. Run the system:
+   ```bash
+   python -m src.sb712.main demo-cycle
+   ```
 
-- [docs/WHITEPAPER.md](docs/WHITEPAPER.md) — protocol & evidence labels
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — module map
-- [docs/SECURITY.md](docs/SECURITY.md) — what is and is not claimed
-- [docs/GOVERNANCE.md](docs/GOVERNANCE.md) — change classes, PR rules
-- [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md) — concept attribution
-- [docs/PRESS_KIT.md](docs/PRESS_KIT.md) — public observer kit
-- [CHANGELOG.md](CHANGELOG.md), [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md), [LICENSE](LICENSE), [NOTICE](NOTICE)
-
-## Targets
-
-| Target | Value |
-|--------|-------|
-| `CORE_OS_TARGET` | 32 MB RAM flip |
-| `CPU_TARGET` | 8 GB chip, hardware agnostic |
-| `failure_tolerance` | zero |
-| `resurrection_speed` | hardware-interrupt class |
-| `STATUS` | `SB689_READY` |
-
-## License
-
-Dual-licensed — **source-available reference** for evaluation /
-research, **commercial license** required for production use. See
-[LICENSE](LICENSE) and [NOTICE](NOTICE).
-
-© 2026 John Arenz (J.G.A.). All rights reserved.
+---
+The system combines cutting-edge tools to demonstrate "**Verification Before Trust.**"

@@ -21,7 +21,7 @@ trademark rights to any contributor or downstream user.
 
 The white paper at [docs/WHITEPAPER.md](docs/WHITEPAPER.md), the
 attribution at [docs/ATTRIBUTION.md](docs/ATTRIBUTION.md), and the
-license at [LICENSE](LICENSE) together govern public use.
+license at [LICENSE.md](LICENSE.md) together govern public use.
 
 Production heuristics, weights, brain content, signing keys,
 customer-specific stitch deployments, and any internal documents

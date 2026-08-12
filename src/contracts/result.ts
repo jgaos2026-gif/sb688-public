@@ -19,7 +19,40 @@ export type RuntimeStage =
   | "failure.restitch"
   | "failure.verify"
   | "failure.log"
-  | "failure.checkpoint";
+  | "failure.checkpoint"
+  // Phoenix Recovery stages
+  | "phoenix.checkpoint"
+  | "phoenix.rollback"
+  | "phoenix.repair"
+  | "phoenix.restart"
+  | "phoenix.replay"
+  | "phoenix.validate"
+  | "phoenix.journal"
+  // Phoenix Patrol stages
+  | "patrol.health"
+  | "patrol.corruption"
+  | "patrol.upload"
+  | "patrol.braid"
+  | "patrol.quarantine"
+  | "patrol.anomaly"
+  // Triad Recovery stages
+  | "triad.hunt"
+  | "triad.warrior"
+  | "triad.repair"
+  | "triad.spine"
+  // Paired Node stages
+  | "paired.master"
+  | "paired.witness"
+  | "paired.quorum"
+  | "paired.disagree"
+  | "paired.checkpoint"
+  // BCT Verification stages
+  | "bct.identity"
+  | "bct.schema"
+  | "bct.crypto"
+  | "bct.braid"
+  | "bct.transaction"
+  | "bct.audit";
 
 export type RuntimeErrorCode =
   | "SPINE_REJECTED"
@@ -30,6 +63,20 @@ export type RuntimeErrorCode =
   | "GHOST_FAILURE"
   | "QUANTUM_INVALID"
   | "LEDGER_APPEND_FAILED"
+  | "PHOENIX_CHECKPOINT_FAILED"
+  | "PHOENIX_ROLLBACK_FAILED"
+  | "PHOENIX_REPAIR_FAILED"
+  | "TRIAD_HUNT_FAILED"
+  | "TRIAD_WARRIOR_FAILED"
+  | "TRIAD_REPAIR_FAILED"
+  | "PAIRED_DISAGREEMENT"
+  | "PAIRED_QUORUM_FAILED"
+  | "BCT_IDENTITY_FAILED"
+  | "BCT_SCHEMA_FAILED"
+  | "BCT_CRYPTO_FAILED"
+  | "BCT_BRAID_FAILED"
+  | "BCT_TRANSACTION_FAILED"
+  | "BCT_AUDIT_FAILED"
   | "UNKNOWN";
 
 export interface RuntimeError {
