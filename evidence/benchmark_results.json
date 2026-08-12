@@ -1,182 +1,182 @@
 {
   "env": {
-    "node": "v24.18.0",
+    "node": "v22.23.1",
     "platform": "linux",
     "arch": "x64",
-    "timestamp": "2026-08-06T01:21:45.787Z"
+    "timestamp": "2026-08-12T05:30:28.117Z"
   },
-  "totalBenchmarkMs": 915.8,
+  "totalBenchmarkMs": 567.34,
   "results": [
     {
       "name": "hashOf (small object)",
       "iterations": 1000,
-      "totalMs": 9.5704,
-      "avgMs": 0.00957,
-      "minMs": 0.003451,
-      "maxMs": 0.866728,
-      "opsPerSec": 104488.81
+      "totalMs": 5.4939,
+      "avgMs": 0.005494,
+      "minMs": 0.002819,
+      "maxMs": 0.51488,
+      "opsPerSec": 182019.06
     },
     {
       "name": "hashOf (large object 1KB)",
       "iterations": 1000,
-      "totalMs": 8.9523,
-      "avgMs": 0.008952,
-      "minMs": 0.005948,
-      "maxMs": 0.266569,
-      "opsPerSec": 111702.89
+      "totalMs": 7.9382,
+      "avgMs": 0.007938,
+      "minMs": 0.005094,
+      "maxMs": 0.231275,
+      "opsPerSec": 125972.65
     },
     {
       "name": "AuditLedger.append x10",
       "iterations": 1000,
-      "totalMs": 83.7745,
-      "avgMs": 0.083775,
-      "minMs": 0.055372,
-      "maxMs": 0.963778,
-      "opsPerSec": 11936.8
+      "totalMs": 43.6516,
+      "avgMs": 0.043652,
+      "minMs": 0.029162,
+      "maxMs": 0.310719,
+      "opsPerSec": 22908.69
     },
     {
       "name": "AuditLedger.verifyChain (10 entries)",
       "iterations": 1000,
-      "totalMs": 131.4149,
-      "avgMs": 0.131415,
-      "minMs": 0.096751,
-      "maxMs": 1.079441,
-      "opsPerSec": 7609.49
+      "totalMs": 72.1832,
+      "avgMs": 0.072183,
+      "minMs": 0.05773,
+      "maxMs": 0.410688,
+      "opsPerSec": 13853.63
     },
     {
       "name": "BraidedRuntime.run (success path)",
       "iterations": 20,
-      "totalMs": 5.5745,
-      "avgMs": 0.278724,
-      "minMs": 0.183864,
-      "maxMs": 0.534352,
-      "opsPerSec": 3587.78
+      "totalMs": 5.0336,
+      "avgMs": 0.251679,
+      "minMs": 0.179965,
+      "maxMs": 0.461001,
+      "opsPerSec": 3973.32
     },
     {
       "name": "BraidedRuntime.run (failure path)",
       "iterations": 20,
-      "totalMs": 5.8105,
-      "avgMs": 0.290524,
-      "minMs": 0.227483,
-      "maxMs": 0.47748,
-      "opsPerSec": 3442.05
+      "totalMs": 5.5922,
+      "avgMs": 0.279611,
+      "minMs": 0.174932,
+      "maxMs": 0.590866,
+      "opsPerSec": 3576.4
     },
     {
       "name": "OmegaSupervisor.tick (stable)",
       "iterations": 500,
-      "totalMs": 24.5818,
-      "avgMs": 0.049164,
-      "minMs": 0.034354,
-      "maxMs": 0.352841,
-      "opsPerSec": 20340.27
+      "totalMs": 13.8723,
+      "avgMs": 0.027745,
+      "minMs": 0.021199,
+      "maxMs": 0.30639,
+      "opsPerSec": 36042.92
     },
     {
       "name": "OmegaSupervisor resurrection",
       "iterations": 500,
-      "totalMs": 29.7014,
-      "avgMs": 0.059403,
-      "minMs": 0.046496,
-      "maxMs": 0.473775,
-      "opsPerSec": 16834.21
+      "totalMs": 22.5349,
+      "avgMs": 0.04507,
+      "minMs": 0.028662,
+      "maxMs": 0.36762,
+      "opsPerSec": 22187.84
     },
     {
       "name": "PhoenixRecovery.checkpoint",
       "iterations": 1000,
-      "totalMs": 30.9121,
-      "avgMs": 0.030912,
-      "minMs": 0.02489,
-      "maxMs": 0.286419,
-      "opsPerSec": 32349.79
+      "totalMs": 18.8978,
+      "avgMs": 0.018898,
+      "minMs": 0.015687,
+      "maxMs": 0.218821,
+      "opsPerSec": 52916.17
     },
     {
       "name": "PhoenixRecovery.rollback (10 snaps)",
       "iterations": 500,
-      "totalMs": 157.7016,
-      "avgMs": 0.315403,
-      "minMs": 0.275237,
-      "maxMs": 0.658649,
-      "opsPerSec": 3170.54
+      "totalMs": 99.444,
+      "avgMs": 0.198888,
+      "minMs": 0.165922,
+      "maxMs": 0.539646,
+      "opsPerSec": 5027.96
     },
     {
       "name": "PhoenixRecovery.replay (10 checkpoints)",
       "iterations": 500,
-      "totalMs": 171.6919,
-      "avgMs": 0.343384,
-      "minMs": 0.303689,
-      "maxMs": 0.710404,
-      "opsPerSec": 2912.19
+      "totalMs": 106.5097,
+      "avgMs": 0.213019,
+      "minMs": 0.181703,
+      "maxMs": 0.495759,
+      "opsPerSec": 4694.41
     },
     {
       "name": "PhoenixPatrol.patrol (clean)",
       "iterations": 500,
-      "totalMs": 38.7486,
-      "avgMs": 0.077497,
-      "minMs": 0.062215,
-      "maxMs": 0.480272,
-      "opsPerSec": 12903.69
+      "totalMs": 26.8014,
+      "avgMs": 0.053603,
+      "minMs": 0.039178,
+      "maxMs": 0.407927,
+      "opsPerSec": 18655.72
     },
     {
       "name": "TriadCoordinator.run (clean)",
       "iterations": 500,
-      "totalMs": 13.3049,
-      "avgMs": 0.02661,
-      "minMs": 0.020883,
-      "maxMs": 0.353288,
-      "opsPerSec": 37580.18
+      "totalMs": 8.9333,
+      "avgMs": 0.017867,
+      "minMs": 0.012763,
+      "maxMs": 0.357179,
+      "opsPerSec": 55970.15
     },
     {
       "name": "TriadCoordinator.run (corrupted)",
       "iterations": 500,
-      "totalMs": 27.7435,
-      "avgMs": 0.055487,
-      "minMs": 0.046528,
-      "maxMs": 0.427533,
-      "opsPerSec": 18022.26
+      "totalMs": 17.7572,
+      "avgMs": 0.035514,
+      "minMs": 0.027872,
+      "maxMs": 0.397777,
+      "opsPerSec": 28157.52
     },
     {
       "name": "PairedNodeSystem.verify (agree)",
       "iterations": 1000,
-      "totalMs": 36.8382,
-      "avgMs": 0.036838,
-      "minMs": 0.030446,
-      "maxMs": 0.476195,
-      "opsPerSec": 27145.7
+      "totalMs": 22.1742,
+      "avgMs": 0.022174,
+      "minMs": 0.0187,
+      "maxMs": 0.312587,
+      "opsPerSec": 45097.55
     },
     {
       "name": "PairedNodeSystem.verify (disagree)",
       "iterations": 1000,
-      "totalMs": 38.7061,
-      "avgMs": 0.038706,
-      "minMs": 0.034059,
-      "maxMs": 0.409132,
-      "opsPerSec": 25835.72
+      "totalMs": 26.9902,
+      "avgMs": 0.02699,
+      "minMs": 0.020102,
+      "maxMs": 0.371862,
+      "opsPerSec": 37050.43
     },
     {
       "name": "BctVerifier.verify (all 6 pass)",
       "iterations": 1000,
-      "totalMs": 45.3772,
-      "avgMs": 0.045377,
-      "minMs": 0.03631,
-      "maxMs": 0.388256,
-      "opsPerSec": 22037.5
+      "totalMs": 26.9479,
+      "avgMs": 0.026948,
+      "minMs": 0.022856,
+      "maxMs": 0.271011,
+      "opsPerSec": 37108.69
     },
     {
       "name": "UploadSentinel.scan (clean)",
       "iterations": 1000,
-      "totalMs": 2.2852,
-      "avgMs": 0.002285,
-      "minMs": 0.001504,
-      "maxMs": 0.067793,
-      "opsPerSec": 437591.37
+      "totalMs": 1.1109,
+      "avgMs": 0.001111,
+      "minMs": 0.000996,
+      "maxMs": 0.015507,
+      "opsPerSec": 900184.81
     },
     {
       "name": "FileUploadManager.receive+dispatch",
       "iterations": 500,
-      "totalMs": 18.7265,
-      "avgMs": 0.037453,
-      "minMs": 0.031695,
-      "maxMs": 0.541985,
-      "opsPerSec": 26700.2
+      "totalMs": 11.7421,
+      "avgMs": 0.023484,
+      "minMs": 0.01967,
+      "maxMs": 0.415064,
+      "opsPerSec": 42581.73
     }
   ]
 }
