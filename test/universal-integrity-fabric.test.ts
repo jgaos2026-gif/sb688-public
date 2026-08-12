@@ -86,7 +86,7 @@ test("universal fabric: runs three sovereign systems through hostile multi-indus
       assert.equal(sovereign.rollbackElapsedMs >= 0, true);
     }
 
-    if (scenario.profile.pulseAlive === false) {
+    if ("pulseAlive" in scenario.profile && scenario.profile.pulseAlive === false) {
       assert.equal(
         report.sovereigns.every((s) => s.resurrectionTriggered),
         true,

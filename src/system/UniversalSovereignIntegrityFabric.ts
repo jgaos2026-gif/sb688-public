@@ -110,11 +110,7 @@ export class UniversalSovereignIntegrityFabric {
     request: IndustryDrillRequest,
     nodeIndex: number
   ): Promise<SovereignDrillResult> {
-    const baselineState = Object.freeze({
-      ...node.seedState,
-      industry: request.industry,
-      profile: request.profile.name
-    });
+    const baselineState = Object.freeze({ ...node.seedState });
     const checkpoint = node.recovery.checkpoint(baselineState, `${request.industry}-baseline`);
     const corrupted = this.corruptState(baselineState, request.profile, nodeIndex);
 
@@ -168,7 +164,7 @@ export class UniversalSovereignIntegrityFabric {
     nodeIndex: number
   ): Record<string, unknown> {
     const tampered = { ...baselineState } as Record<string, unknown>;
-    const keys = profile.tamperKeys ?? ["integrity", "domain", "profile", "industry"];
+    const keys = profile.tamperKeys ?? ["integrity", "domain", "protocol", "sovereign"];
 
     for (const key of keys) {
       tampered[key] = `tampered:${profile.name}:node-${nodeIndex + 1}:${key}`;
