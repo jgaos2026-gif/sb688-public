@@ -98,5 +98,16 @@ npm run demo
 
 ---
 
+## The Oasis
+
+**The Oasis** is the modular business Clip Brick network. Each connected business operates
+as a numbered brick within the shared SB689 governance and resilience layer.
+
+| Brick | Business |
+|-------|----------|
+| Brick 1 | **Jays Graphic Arts** |
+
+---
+
 © 2026 John Arenz (J.G.A.). MIT licensed.  
 [jgaos2026-gif.com](https://www.jgaos2026-gif.com)

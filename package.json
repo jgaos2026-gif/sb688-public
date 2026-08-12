@@ -17,6 +17,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "npm run build && node --test dist/test/*.test.js",
+    "benchmark": "npm run build && node dist/benchmark/run.js",
     "demo": "npm run build && node dist/demo/runDemo.js",
     "system": "npm run build && node dist/demo/runSystem.js",
     "system:dev": "npm run system",
@@ -37,7 +38,7 @@
   "license": "MIT",
   "homepage": "https://www.jgaos2026-gif.com",
   "devDependencies": {
-    "@types/node": "25.9.1",
-    "typescript": "6.0.3"
+    "@types/node": "26.1.2",
+    "typescript": "7.0.2"
   }
 }
