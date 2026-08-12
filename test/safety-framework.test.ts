@@ -110,10 +110,10 @@ test("drift trend reports metric deltas over versions", () => {
     }
   ];
   const trend = computeDriftTrend(points);
-  assert.equal(trend.violationDelta, 0.02);
-  assert.equal(trend.hallucinationDelta, 0.02);
-  assert.equal(trend.consistencyDelta, -0.04);
-  assert.equal(trend.refusalDelta, -0.02);
+  assert.ok(Math.abs(trend.violationDelta - 0.02) < 1e-12);
+  assert.ok(Math.abs(trend.hallucinationDelta - 0.02) < 1e-12);
+  assert.ok(Math.abs(trend.consistencyDelta - -0.04) < 1e-12);
+  assert.ok(Math.abs(trend.refusalDelta - -0.02) < 1e-12);
 });
 
 test("release gate blocks candidates that regress or exceed thresholds", () => {
