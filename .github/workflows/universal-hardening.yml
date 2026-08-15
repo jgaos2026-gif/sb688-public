@@ -1,0 +1,39 @@
+name: universal-hardening
+
+on:
+  push:
+    branches:
+      - stitch/universal-hardening-2026-08-15
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hardened-build-test-campaign:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20.x, 22.x]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build and run complete test suite
+        run: npm run verify
+      - name: Run universal hardening fault campaign
+        run: npm run hardening:campaign
+      - name: Upload hardening evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: universal-hardening-evidence-node-${{ matrix.node-version }}
+          path: evidence/universal_hardening_campaign.json
+          if-no-files-found: warn
