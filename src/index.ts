@@ -31,5 +31,8 @@ export * from "./truth/BctVerifier";
 export * from "./sovereign/SovereignArchitecture";
 export * from "./sovereign/ProactiveIntegrityFabric";
 export * from "./security/UniversalHardening";
+export * from "./security/SuperHardeningGate";
+export * from "./security/DeepSpaceEndurance";
 export * from "./security/OperatorAccessGate";
 export * from "./security/HardenedBackendKernel";
+export * from "./heartbeat/SovereignHeartbeatGovernor";
