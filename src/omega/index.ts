@@ -4,4 +4,5 @@ export * from "./GhostBrick";
 export * from "./ArmorBrick";
 export * from "./CrownBrick";
 export * from "./SovereignStitch";
+export * from "./SentinelLayer";
 export * from "./OmegaSupervisor";
