@@ -16,9 +16,10 @@ An enterprise OS for bold automation and ethical scalability:
 ## Features:
 1. **SB688 Verification Law:** Ensuring ethical automation through strict data validity protocols.
 2. **SB712 Runtime:** Automating all major business cycles (customer, sales, invoicing, compliance).
-3. **Watchdog and Phoenix System:** Live system health checks and controlled checkpoint recovery.
+3. **Watchdog and Phoenix System:** Live system health checks and controlled checkpoint recovery. Tracks system status across all active bricks.
 4. **Quarantine System:** Isolate failed data or unauthorized processes from affecting operations.
 5. **Clip Brick Modular Deployment:** Connect enterprise or satellite offices while enforcing access control.
+6. **Triple Braid Architecture:** Governance, runtime, and verification woven together via the triple braid pattern for resilient operations. See [stitch_bridge.md](STITCH_BRIDGE.md) for details on the spine proxy routing layer.
 
 ---
 
