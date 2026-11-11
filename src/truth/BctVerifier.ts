@@ -179,6 +179,19 @@ export class BctHeadRegistry {
     this.heads.set(identity, stateHash);
   }
 
+  /** Atomically register a genesis head only when no head exists. */
+  registerIfAbsent(identity: string, stateHash: string): boolean {
+    if (typeof identity !== "string" || identity.trim().length === 0) {
+      throw new Error("REGISTRY_REJECTED: identity must be a non-empty string.");
+    }
+    if (!isWellFormedHash(stateHash)) {
+      throw new Error("REGISTRY_REJECTED: genesis head hash is malformed.");
+    }
+    if (this.heads.has(identity)) return false;
+    this.heads.set(identity, stateHash);
+    return true;
+  }
+
   /**
    * Advance the head after a trusted transition. Returns false (and
    * changes nothing) unless the recorded head equals the expected prior
@@ -336,10 +349,42 @@ export class BctVerifier {
     // parent or a competing branch is rejected from here on. This runs
     // ONLY after the audit commit above succeeded (finding D).
     if (trusted && typeof input.identity === "string" && typeof input.declaredHash === "string") {
-      if (input.priorStateHash === undefined || input.priorStateHash === "GENESIS") {
-        this.registry.register(input.identity, input.declaredHash);
-      } else {
-        this.registry.advance(input.identity, input.priorStateHash, input.declaredHash);
+      const committed = input.priorStateHash === undefined || input.priorStateHash === "GENESIS"
+        ? this.registry.registerIfAbsent(input.identity, input.declaredHash)
+        : this.registry.advance(input.identity, input.priorStateHash, input.declaredHash);
+      if (!committed) {
+        // Never return trusted when the authoritative head did not move.
+        // This should be unreachable for the built-in synchronous registry,
+        // but injected/shared registries must obey the same compare-and-set.
+        trusted = false;
+        layers[4] = {
+          layer: "transaction",
+          passed: false,
+          message: "Authoritative chain-head compare-and-set failed — transition was not committed.",
+          detail: {
+            identity: input.identity,
+            expectedPrior: input.priorStateHash ?? "GENESIS",
+            registeredHead: this.registry.head(input.identity)
+          }
+        };
+        failedLayers = layers.filter((l) => !l.passed).map((l) => l.layer);
+        finalHash = hashOf({
+          input: { identity: input.identity, declaredHash: input.declaredHash },
+          layers
+        });
+        try {
+          this.ledger.append({
+            traceId: `bct:${input.identity}`,
+            from: "bct.registry",
+            to: "bct.identity",
+            status: "failed",
+            at,
+            detail: { trusted: false, failedLayers, finalHash,
+                      reason: "chain-head compare-and-set failed" }
+          });
+        } catch {
+          ledgerAppendFailed = true;
+        }
       }
     }
 
