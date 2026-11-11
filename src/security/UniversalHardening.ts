@@ -150,39 +150,89 @@ export interface PromotionDecision {
 export class UniversalHardeningGate {
   readonly environment: EnvironmentProfile;
 
-  constructor(environment: EnvironmentId | EnvironmentProfile = "GENERAL") {
-    this.environment = typeof environment === "string" ? ENVIRONMENT_PROFILES[environment] : environment;
+  constructor(
+    environment: EnvironmentId = "GENERAL",
+    readonly currentPolicyVersion = "v1"
+  ) {
+    const selected = ENVIRONMENT_PROFILES[environment];
+    if (!selected) throw new Error("unknown hardening environment profile");
+    if (typeof currentPolicyVersion !== "string" || !currentPolicyVersion.trim()) {
+      throw new Error("current policy version is required");
+    }
+    this.environment = selected;
   }
 
   inspect(candidate: ArtifactCandidate, signals: readonly ThreatSignal[] = []): PurificationDecision {
     const reasons: string[] = [];
     const p = this.environment;
 
-    if (!candidate.id.trim()) reasons.push("missing artifact identity");
-    if (candidate.sizeBytes < 0 || candidate.sizeBytes > p.maxInputBytes) reasons.push("input size outside environment limit");
-    if (p.requireAuthenticatedSource && !candidate.sourceAuthenticated) reasons.push("source authentication required");
-    if (p.requireProvenance && !candidate.provenancePresent) reasons.push("provenance required");
-    if (!candidate.sourceId && p.requireAuthenticatedSource) reasons.push("source identity required");
-    if (Math.abs(candidate.currentTimeMs - candidate.observedAtMs) > p.maxClockSkewMs) reasons.push("clock/timebase outside allowed skew");
-    if (candidate.declaredPolicyVersion !== candidate.currentPolicyVersion) reasons.push("policy version drift");
-    if (candidate.replayDetected) reasons.push("replay or rollback abuse detected");
-    if (candidate.evidenceIntact === false) reasons.push("evidence integrity failure");
-    if (candidate.executableOrActiveContent && p.id === "NATIONAL_SECURITY") reasons.push("active content requires isolated execution path");
+    if (candidate === null || typeof candidate !== "object") {
+      reasons.push("artifact candidate must be an object");
+    } else {
+      if (typeof candidate.id !== "string" || !candidate.id.trim()) reasons.push("missing artifact identity");
+      if (!Number.isSafeInteger(candidate.sizeBytes) || candidate.sizeBytes < 0 ||
+          candidate.sizeBytes > p.maxInputBytes) reasons.push("input size outside environment limit or invalid");
+      if (p.requireAuthenticatedSource && candidate.sourceAuthenticated !== true) reasons.push("source authentication required");
+      if (p.requireProvenance && candidate.provenancePresent !== true) reasons.push("provenance required");
+      if (p.requireAuthenticatedSource &&
+          (typeof candidate.sourceId !== "string" || !candidate.sourceId.trim())) reasons.push("source identity required");
+      if (!Number.isFinite(candidate.currentTimeMs) || candidate.currentTimeMs < 0 ||
+          !Number.isFinite(candidate.observedAtMs) || candidate.observedAtMs < 0) {
+        reasons.push("artifact timestamps must be finite non-negative numbers");
+      } else if (Math.abs(candidate.currentTimeMs - candidate.observedAtMs) > p.maxClockSkewMs) {
+        reasons.push("clock/timebase outside allowed skew");
+      }
+      if (typeof candidate.declaredPolicyVersion !== "string" ||
+          candidate.declaredPolicyVersion !== this.currentPolicyVersion) reasons.push("declared policy version drift");
+      if (candidate.replayDetected === true) reasons.push("replay or rollback abuse detected");
+      if (candidate.evidenceIntact !== true) reasons.push("evidence integrity is missing or failed");
+      if (candidate.executableOrActiveContent === true && p.id === "NATIONAL_SECURITY") {
+        reasons.push("active content requires isolated execution path");
+      }
+    }
 
-    for (const signal of signals) {
-      if (!Number.isFinite(signal.confidence) || signal.confidence < 0 || signal.confidence > 1) {
-        reasons.push("invalid threat-signal confidence");
-        continue;
-      }
-      if (signal.type === "TRANSPORT_PARTITION_OR_REORDER" && p.tolerateNetworkPartition) {
-        continue;
-      }
-      if (signal.type === "UNKNOWN" && p.failClosedOnUnknown && signal.severity !== "LOW") {
-        reasons.push("unknown threat class fails closed");
-        continue;
-      }
-      if (signal.severity === "CRITICAL" || (signal.severity === "HIGH" && signal.confidence >= 0.7)) {
-        reasons.push(`blocking threat: ${signal.type}`);
+    if (!Array.isArray(signals)) {
+      reasons.push("threat signals must be an array");
+    } else {
+      for (const signal of signals) {
+        if (signal === null || typeof signal !== "object") {
+          reasons.push("malformed threat signal");
+          continue;
+        }
+        const validSeverity = ["LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(signal.severity);
+        const validType = typeof signal.type === "string" &&
+          (DEFAULT_THREAT_MATRIX as readonly string[]).includes(signal.type);
+        if (!validSeverity) {
+          reasons.push("invalid threat-signal severity");
+          continue;
+        }
+        if (!Number.isFinite(signal.confidence) || signal.confidence < 0 || signal.confidence > 1) {
+          reasons.push("invalid threat-signal confidence");
+          continue;
+        }
+        if (typeof signal.detail !== "string" || !signal.detail.trim() ||
+            typeof signal.source !== "string" || !signal.source.trim()) {
+          reasons.push("threat signal requires detail and source provenance");
+          continue;
+        }
+        if (!validType) {
+          if (p.failClosedOnUnknown && signal.severity !== "LOW") {
+            reasons.push("unknown threat class fails closed");
+          } else if (signal.severity === "CRITICAL" ||
+                     (signal.severity === "HIGH" && signal.confidence >= 0.7)) {
+            reasons.push("unknown threat severity blocks");
+          }
+          continue;
+        }
+        if (signal.type === "TRANSPORT_PARTITION_OR_REORDER" && p.tolerateNetworkPartition) continue;
+        if (signal.type === "UNKNOWN" && p.failClosedOnUnknown && signal.severity !== "LOW") {
+          reasons.push("unknown threat class fails closed");
+          continue;
+        }
+        if (signal.severity === "CRITICAL" ||
+            (signal.severity === "HIGH" && signal.confidence >= 0.7)) {
+          reasons.push(`blocking threat: ${signal.type}`);
+        }
       }
     }
 
@@ -198,23 +248,56 @@ export class UniversalHardeningGate {
   authorizePromotion(evidence: PromotionEvidence): PromotionDecision {
     const reasons: string[] = [];
     const p = this.environment;
-    const uniqueCertifiers = new Set(evidence.certifierIds.filter((id) => id.trim().length > 0));
+    if (evidence === null || typeof evidence !== "object") {
+      reasons.push("promotion evidence must be an object");
+    } else {
+      if (evidence.verified !== true) reasons.push("verification missing or failed");
+      if (evidence.validated !== true) reasons.push("validation missing or failed");
 
-    if (!evidence.verified) reasons.push("verification missing or failed");
-    if (!evidence.validated) reasons.push("validation missing or failed");
-    if (uniqueCertifiers.size < p.minIndependentCertifiers) reasons.push("insufficient independent certification");
-    if (uniqueCertifiers.size !== evidence.certifierIds.length) reasons.push("duplicate/self certification path detected");
-    if (!evidence.checkpointPresent) reasons.push("checkpoint required before promotion");
-    if (!evidence.evidencePreserved) reasons.push("evidence preservation required");
-    if (!evidence.policyVersion.trim()) reasons.push("policy version required");
-    if (p.requireHumanApprovalForCriticalChange && evidence.humanApprovedCriticalChange === false) {
-      reasons.push("human approval required for critical change");
-    }
+      if (!Array.isArray(evidence.certifierIds)) {
+        reasons.push("certifier identities must be an array");
+      } else {
+        const validIds = evidence.certifierIds.filter(
+          (id) => typeof id === "string" && id.trim().length > 0
+        );
+        if (validIds.length !== evidence.certifierIds.length) reasons.push("invalid certifier identity");
+        const uniqueCertifiers = new Set(validIds);
+        if (uniqueCertifiers.size < p.minIndependentCertifiers) reasons.push("insufficient independent certifiers");
+        if (uniqueCertifiers.size !== evidence.certifierIds.length) reasons.push("duplicate/self certification path detected");
+      }
 
-    for (const signal of evidence.unresolvedSignals ?? []) {
-      if (signal.type === "TRANSPORT_PARTITION_OR_REORDER" && p.tolerateNetworkPartition) continue;
-      if (signal.severity === "CRITICAL" || signal.severity === "HIGH") reasons.push(`unresolved threat: ${signal.type}`);
-      if (signal.type === "UNKNOWN" && p.failClosedOnUnknown) reasons.push("unresolved unknown threat");
+      if (evidence.checkpointPresent !== true) reasons.push("checkpoint required before promotion");
+      if (evidence.evidencePreserved !== true) reasons.push("evidence preservation required");
+      if (typeof evidence.policyVersion !== "string" ||
+          evidence.policyVersion !== this.currentPolicyVersion) reasons.push("promotion policy version missing or drifted");
+      if (p.requireHumanApprovalForCriticalChange && evidence.humanApprovedCriticalChange !== true) {
+        reasons.push("human approval required for critical change");
+      }
+
+      if (evidence.unresolvedSignals !== undefined && !Array.isArray(evidence.unresolvedSignals)) {
+        reasons.push("unresolved threat signals must be an array");
+      } else {
+        for (const signal of evidence.unresolvedSignals ?? []) {
+          if (signal === null || typeof signal !== "object" ||
+              typeof signal.type !== "string" ||
+              !["LOW", "MEDIUM", "HIGH", "CRITICAL"].includes(signal.severity) ||
+              !Number.isFinite(signal.confidence) || signal.confidence < 0 || signal.confidence > 1 ||
+              typeof signal.detail !== "string" || !signal.detail.trim() ||
+              typeof signal.source !== "string" || !signal.source.trim()) {
+            reasons.push("malformed unresolved threat signal");
+            continue;
+          }
+          if (signal.type === "TRANSPORT_PARTITION_OR_REORDER" && p.tolerateNetworkPartition) continue;
+          if (!((DEFAULT_THREAT_MATRIX as readonly string[]).includes(signal.type)) &&
+              p.failClosedOnUnknown && signal.severity !== "LOW") {
+            reasons.push("unresolved unknown threat");
+          } else if (signal.type === "UNKNOWN" && p.failClosedOnUnknown && signal.severity !== "LOW") {
+            reasons.push("unresolved unknown threat");
+          } else if (signal.severity === "CRITICAL" || signal.severity === "HIGH") {
+            reasons.push(`unresolved threat: ${signal.type}`);
+          }
+        }
+      }
     }
 
     const certified = reasons.length === 0;
