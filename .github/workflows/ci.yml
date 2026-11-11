@@ -2,7 +2,7 @@ name: ci
 
 on:
   push:
-    branches: [main]
+    branches: [main, copilot/sb688-public-master-hardened]
   pull_request:
     branches: [main]
 
