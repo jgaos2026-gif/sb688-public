@@ -8,8 +8,8 @@ function candidate(overrides: Partial<ArtifactCandidate> = {}): ArtifactCandidat
 function signal(type: ThreatClass, severity: Severity = "HIGH", confidence = 0.9) { return { type, severity, confidence, detail: "fault injection", source: "test-harness" } as const; }
 
 const testVerifier = () => true;
-function gate(environment: EnvironmentId, policyVersion = "v1") {
-  return new UniversalHardeningGate(environment, policyVersion, testVerifier);
+function gate(environment: EnvironmentId, policyVersion = "v1", verifier: (proof: PromotionEvidence) => boolean = testVerifier) {
+  return new UniversalHardeningGate(environment, policyVersion, verifier);
 }
 
 function evidence(overrides: Partial<PromotionEvidence> = {}): PromotionEvidence { return { verified: true, validated: true, certifierIds: ["v1","v2","v3"], certifierProofs: ["v1","v2","v3"].map((id) => ({ certifierId: id, keyId: `key-${id}`, signature: `sig-${id}`, payloadHash: "a".repeat(64) })), checkpointPresent: true, evidencePreserved: true, policyVersion: "v1", humanApprovedCriticalChange: true, ...overrides }; }
@@ -33,8 +33,8 @@ test("environment profiles all require evidence-bound promotion", () => { for (c
 
 
 test("malformed artifacts and non-finite measurements fail closed", () => {
-  const gate = gate("AI_AGENT");
-  assert.equal(gate.inspect(null as unknown as ArtifactCandidate).state, "QUARANTINED");
+  const hardening = gate("AI_AGENT");
+  assert.equal(hardening.inspect(null as unknown as ArtifactCandidate).state, "QUARANTINED");
   assert.equal(gate.inspect(candidate({ sizeBytes: Number.NaN })).state, "QUARANTINED");
   assert.equal(gate.inspect(candidate({ observedAtMs: Number.NaN })).state, "QUARANTINED");
   assert.equal(gate.inspect(candidate({ evidenceIntact: undefined })).state, "QUARANTINED");
@@ -48,8 +48,8 @@ test("malformed threat signals fail closed instead of throwing", () => {
 });
 
 test("promotion rejects truthy strings, policy drift, and missing human approval", () => {
-  const gate = gate("NATIONAL_SECURITY", "v2");
-  assert.equal(gate.authorizePromotion(evidence({
+  const hardening = gate("NATIONAL_SECURITY", "v2");
+  assert.equal(hardening.authorizePromotion(evidence({
     verified: "true" as unknown as boolean,
     policyVersion: "v2"
   })).state, "QUARANTINED");
@@ -63,7 +63,7 @@ test("promotion rejects truthy strings, policy drift, and missing human approval
 });
 
 test("malformed promotion evidence and invalid environment fail closed", () => {
-  const gate = gate("GENERAL");
+  const hardening = gate("GENERAL");
   assert.equal(gate.authorizePromotion(null as unknown as PromotionEvidence).state, "QUARANTINED");
   assert.throws(() => gate("NOT_A_REAL_ENV" as EnvironmentId));
 });
