@@ -10,7 +10,16 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "skipLibCheck": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["src/**/*.ts", "test/**/*.ts", "demo/**/*.ts", "benchmark/**/*.ts", "types/**/*.d.ts"]
+  "include": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "demo/**/*.ts",
+    "benchmark/**/*.ts",
+    "types/**/*.d.ts",
+    "scripts/**/*.ts"
+  ]
 }
