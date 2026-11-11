@@ -33,3 +33,30 @@ export * from "./truth/PermitReplayStore";
 export * from "./utils/fileLock";
 export * from "./utils/hash";
 export * from "./safety";
+
+export * from "./evidence/EvidenceBundle";
+export * from "./phoenix/StitchRecoveryCapsule";
+export * from "./sovereign/SovereignArchitecture";
+export * from "./sovereign/ProactiveIntegrityFabric";
+export * from "./trust/TrustStateMachine";
+export * from "./system/FourSovereignFabric";
+export * from "./heartbeat/SovereignHeartbeatGovernor";
+export * from "./security/OperatorAccessGate";
+export * from "./security/SuperHardeningGate";
+export * from "./security/HardenedBackendKernel";
+export {
+  UniversalHardeningGate,
+  ENVIRONMENT_PROFILES,
+  UNIVERSAL_CONSTITUTION
+} from "./security/UniversalHardening";
+export type {
+  EnvironmentId,
+  EnvironmentProfile,
+  ArtifactCandidate,
+  Severity,
+  PurificationDecision,
+  PromotionEvidence,
+  PromotionDecision,
+  ThreatClass as UniversalThreatClass,
+  ThreatSignal as UniversalThreatSignal
+} from "./security/UniversalHardening";
