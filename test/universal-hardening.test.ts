@@ -24,3 +24,40 @@ test("erased evidence cannot rejoin", () => { assert.equal(new UniversalHardenin
 test("unresolved critical threat blocks promotion", () => { assert.equal(new UniversalHardeningGate("HEALTHCARE").authorizePromotion(evidence({unresolvedSignals:[signal("SENSOR_OR_VERIFIER_DISAGREEMENT","CRITICAL",1)]})).state, "QUARANTINED"); });
 test("all declared threat classes fail closed when injected as critical except tolerated transport partitions", () => { for (const threat of DEFAULT_THREAT_MATRIX) { const d = new UniversalHardeningGate("NATIONAL_SECURITY").inspect(candidate(), [signal(threat,"CRITICAL",1)]); if (threat === "TRANSPORT_PARTITION_OR_REORDER") assert.equal(d.state, "PURIFIED_CANDIDATE", threat); else assert.equal(d.state, "QUARANTINED", threat); } });
 test("environment profiles all require evidence-bound promotion", () => { for (const id of Object.keys(ENVIRONMENT_PROFILES)) { const d = new UniversalHardeningGate(id as keyof typeof ENVIRONMENT_PROFILES).authorizePromotion(evidence({verified:false})); assert.equal(d.state, "QUARANTINED", id); } });
+
+
+test("malformed artifacts and non-finite measurements fail closed", () => {
+  const gate = new UniversalHardeningGate("AI_AGENT");
+  assert.equal(gate.inspect(null as unknown as ArtifactCandidate).state, "QUARANTINED");
+  assert.equal(gate.inspect(candidate({ sizeBytes: Number.NaN })).state, "QUARANTINED");
+  assert.equal(gate.inspect(candidate({ observedAtMs: Number.NaN })).state, "QUARANTINED");
+  assert.equal(gate.inspect(candidate({ evidenceIntact: undefined })).state, "QUARANTINED");
+});
+
+test("malformed threat signals fail closed instead of throwing", () => {
+  const gate = new UniversalHardeningGate("AI_AGENT");
+  const result = gate.inspect(candidate(), [null as unknown as ReturnType<typeof signal>]);
+  assert.equal(result.state, "QUARANTINED");
+  assert.ok(result.reasons.includes("malformed threat signal"));
+});
+
+test("promotion rejects truthy strings, policy drift, and missing human approval", () => {
+  const gate = new UniversalHardeningGate("NATIONAL_SECURITY", "v2");
+  assert.equal(gate.authorizePromotion(evidence({
+    verified: "true" as unknown as boolean,
+    policyVersion: "v2"
+  })).state, "QUARANTINED");
+  assert.equal(gate.authorizePromotion(evidence({
+    policyVersion: "v1"
+  })).state, "QUARANTINED");
+  assert.equal(gate.authorizePromotion(evidence({
+    policyVersion: "v2",
+    humanApprovedCriticalChange: undefined
+  })).state, "QUARANTINED");
+});
+
+test("malformed promotion evidence and invalid environment fail closed", () => {
+  const gate = new UniversalHardeningGate("GENERAL");
+  assert.equal(gate.authorizePromotion(null as unknown as PromotionEvidence).state, "QUARANTINED");
+  assert.throws(() => new UniversalHardeningGate("NOT_A_REAL_ENV" as EnvironmentId));
+});
