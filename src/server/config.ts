@@ -24,10 +24,10 @@ export function readServerRuntimeConfig(
   const environment = normalizeEnvironment(env["SB688_ENV"]);
   const host = override.host ?? env["SB688_HOST"] ?? DEFAULTS.host;
   const operatorToken = env["SB688_OPERATOR_TOKEN"] ?? "";
-  const requireOperatorAuth = environment === "production" || !isLoopbackHost(host);
+  const requireOperatorAuth = environment === "production" || environment === "staging" || !isLoopbackHost(host);
 
   if (requireOperatorAuth && operatorToken.length < 32) {
-    throw new Error("SB688_OPERATOR_TOKEN must contain at least 32 characters for production or non-loopback binding.");
+    throw new Error("SB688_OPERATOR_TOKEN must contain at least 32 characters for staging, production, or non-loopback binding.");
   }
 
   return Object.freeze({
