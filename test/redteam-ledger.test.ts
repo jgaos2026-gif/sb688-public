@@ -80,7 +80,7 @@ test("07: a verifier on a corrupt ledger reports the failure instead of throwing
       identity: "x",
       state: {},
       declaredHash: "sha256:" + "00".repeat(32),
-      braidSignature: "sha256:x",
+      braidBindingHash: "sha256:x",
       spineSignature: "sha256:y",
       priorAuditHash: "GENESIS"
     });

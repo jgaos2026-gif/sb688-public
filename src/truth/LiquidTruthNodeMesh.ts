@@ -14,6 +14,7 @@ import { hashOf } from "../utils/hash";
 import type { Clock } from "../utils/time";
 import { systemClock } from "../utils/time";
 import { verifySpinePermitSignature } from "./SpinePermitCrypto";
+import { PermitReplayStore } from "./PermitReplayStore";
 
 export interface LiquidTruthNodeMeshOptions {
   /**
@@ -25,6 +26,22 @@ export interface LiquidTruthNodeMeshOptions {
   readonly publicKey?: KeyObject | string;
   /** Clock for expiry checks. Defaults to the system clock. */
   readonly clock?: Clock;
+  /**
+   * DURABLE replay store path (round 3). When set, used permit
+   * signatures are persisted (write + fsync, alongside the ledger
+   * persistence) and re-checked from disk, so a previously accepted
+   * permit is STILL a replay after a process restart. Without it,
+   * replay protection is in-memory only and a restart forgets every
+   * used permit — that is the documented default, not a silent
+   * guarantee. OPERATOR STEP: pass a path the process may
+   * create/write, e.g. `./data/used-permits.jsonl`, next to the
+   * ledger file.
+   */
+  readonly replayStorePath?: string;
+  /** How long replay-store writes wait for the single-writer lock. Default 10_000 ms. */
+  readonly replayLockTimeoutMs?: number;
+  /** Age after which an unparseable replay-store lock file counts as stale. Default 30_000 ms. */
+  readonly replayLockStaleMs?: number;
 }
 
 export class LiquidTruthNodeMesh {
@@ -33,18 +50,43 @@ export class LiquidTruthNodeMesh {
   private readonly clock: Clock;
   /** Signatures already accepted — a permit may verify exactly once. */
   private readonly seenPermitSignatures = new Set<string>();
+  private readonly replayStore?: PermitReplayStore;
 
   constructor(quantum = new QuantumDistributionValidator(), options: LiquidTruthNodeMeshOptions = {}) {
     this.quantum = quantum;
     this.publicKey = options.publicKey;
     this.clock = options.clock ?? systemClock;
+    if (options.replayStorePath) {
+      this.replayStore = new PermitReplayStore(options.replayStorePath, {
+        lockTimeoutMs: options.replayLockTimeoutMs,
+        lockStaleMs: options.replayLockStaleMs
+      });
+    }
+  }
+
+  /** True when this signature was already used (durable store when configured, else in-memory set). */
+  private isReplay(signature: string): boolean {
+    return this.replayStore ? this.replayStore.has(signature) : this.seenPermitSignatures.has(signature);
+  }
+
+  /**
+   * Mark a signature used. Durable store: persists first (write +
+   * fsync), then memory — returns false when the signature was
+   * already recorded (a replay that slipped between the check and
+   * the record), and throws when the durable write fails.
+   */
+  private markPermitUsed(signature: string): boolean {
+    if (this.replayStore) return this.replayStore.record(signature);
+    if (this.seenPermitSignatures.has(signature)) return false;
+    this.seenPermitSignatures.add(signature);
+    return true;
   }
 
   validatePreBrain(intent: UserIntent, permit: SpinePermit): Result<TruthReport> {
     const signatureCheck = this.checkPermitSignature(permit);
     const freshnessCheck = this.checkPermitFreshness(permit);
     const replayCheck =
-      typeof permit.signature === "string" && this.seenPermitSignatures.has(permit.signature)
+      typeof permit.signature === "string" && this.isReplay(permit.signature)
         ? { passed: false, message: "Spine permit signature has already been used — replay rejected." }
         : { passed: true, message: "Spine permit has not been seen before." };
 
@@ -83,9 +125,32 @@ export class LiquidTruthNodeMesh {
 
     const result = this.report("pre-brain", findings);
     // Only a permit that fully verified is marked seen — a failed
-    // attempt must not burn a legitimate permit's one use.
+    // attempt must not burn a legitimate permit's one use. The mark
+    // itself is DURABLE when a replay store is configured: if the
+    // write fails, or another process recorded the signature first,
+    // the permit is NOT trusted — its one-time use could not be
+    // recorded, so a replay after restart could not be excluded.
     if (result.ok && typeof permit.signature === "string") {
-      this.seenPermitSignatures.add(permit.signature);
+      try {
+        const recorded = this.markPermitUsed(permit.signature);
+        if (!recorded) {
+          return err(
+            "REPLAY_REJECTED",
+            "truth.pre",
+            "Spine permit signature was already used (recorded by another process between the check and the record) — replay rejected.",
+            true,
+            result.value
+          );
+        }
+      } catch (cause) {
+        return err(
+          "REPLAY_STORE_FAILED",
+          "truth.pre",
+          `Spine permit verified, but its one-time use could not be durably recorded (${cause instanceof Error ? cause.message : String(cause)}); refusing to trust it — a replay after restart could not be excluded.`,
+          true,
+          result.value
+        );
+      }
     }
     return result;
   }

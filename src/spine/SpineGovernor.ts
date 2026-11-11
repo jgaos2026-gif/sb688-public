@@ -27,6 +27,17 @@ export interface SpineGovernorOptions {
   readonly clock?: Clock;
   /** Permit lifetime in milliseconds. Defaults to 5 minutes. */
   readonly permitTtlMs?: number;
+  /**
+   * FAIL VISIBLE (round 3): when true, construction THROWS unless a
+   * durable signing key was supplied (`signingKey`). A deployment
+   * that must be secured sets this — otherwise a missing key silently
+   * falls back to an ephemeral per-process pair, permits verify only
+   * within the process, and an operator could mistake an
+   * operationally functional but unauthenticated configuration for a
+   * secured deployment. Default false: ephemeral keys remain allowed
+   * for local/dev use, clearly labeled via `keyProvenance`.
+   */
+  readonly requireDurableKey?: boolean;
 }
 
 export const DEFAULT_PERMIT_TTL_MS = 5 * 60 * 1000;
@@ -38,22 +49,43 @@ export class SpineGovernor {
   private readonly issuer: string;
   private readonly clock: Clock;
   private readonly permitTtlMs: number;
+  private readonly keyIsEphemeral: boolean;
 
   constructor(rules: readonly SpineRule[] = defaultSpineRules, options: SpineGovernorOptions = {}) {
     this.rules = rules;
+    if (options.requireDurableKey === true && !options.signingKey) {
+      throw new Error(
+        "SPINE_KEY_MISSING: this deployment requires a durable spine signing key, but none was configured. " +
+          "Supply one via SpineGovernor({ signingKey }) — e.g. loadSpineKeysFromEnv() reading SB688_SPINE_PRIVATE_KEY / SB688_SPINE_PRIVATE_KEY_FILE — " +
+          "or remove requireDurableKey to run with a clearly-labeled ephemeral key (local/dev only: permits do not survive a restart and cannot be verified by another process)."
+      );
+    }
     if (options.signingKey) {
       this.privateKey = typeof options.signingKey === "string"
         ? createPrivateKey(options.signingKey)
         : options.signingKey;
       this.publicKey = createPublicKey(this.privateKey);
+      this.keyIsEphemeral = false;
     } else {
       const pair = generateSpineKeyPair();
       this.privateKey = pair.privateKey;
       this.publicKey = pair.publicKey;
+      this.keyIsEphemeral = true;
     }
     this.issuer = options.issuer ?? "spine";
     this.clock = options.clock ?? systemClock;
     this.permitTtlMs = options.permitTtlMs ?? DEFAULT_PERMIT_TTL_MS;
+  }
+
+  /**
+   * Where this governor's signing key came from: "durable" when the
+   * operator supplied a long-lived key, "ephemeral" for the
+   * per-process generated pair (local/dev only — permits verify
+   * within this process and do not survive a restart). Never mistake
+   * "ephemeral" for a secured deployment.
+   */
+  get keyProvenance(): "durable" | "ephemeral" {
+    return this.keyIsEphemeral ? "ephemeral" : "durable";
   }
 
   /** The public key this governor's permits verify against. */

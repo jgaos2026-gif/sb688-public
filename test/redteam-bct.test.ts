@@ -5,7 +5,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AuditLedger } from "../src";
-import { BctVerifier, computeBraidSignature, computeTransitionHash } from "../src/truth/BctVerifier";
+import { BctVerifier, computeBraidBindingHash, computeTransitionHash } from "../src/truth/BctVerifier";
 import { hashOf } from "../src/utils/hash";
 import { fixedClock } from "../src/utils/time";
 
@@ -26,7 +26,7 @@ function inputFor(state: Record<string, unknown>, overrides: Record<string, unkn
     identity: "intent-001",
     state,
     declaredHash,
-    braidSignature: computeBraidSignature(declaredHash, SPINE_SIG),
+    braidBindingHash: computeBraidBindingHash(declaredHash, SPINE_SIG),
     spineSignature: SPINE_SIG,
     priorAuditHash: "GENESIS",
     ...overrides
@@ -173,7 +173,7 @@ test("16: wrong-typed fields return a structured rejection, never throw", () => 
       identity: "x",
       state: null,
       declaredHash: 123,
-      braidSignature: { not: "a-string" },
+      braidBindingHash: { not: "a-string" },
       spineSignature: null,
       priorAuditHash: ["GENESIS"]
     } as never);
@@ -189,10 +189,10 @@ test("16: wrong-typed fields return a structured rejection, never throw", () => 
 
 test("16: missing identity and empty state object are rejections, not exceptions", () => {
   const { v } = makeVerifier();
-  const r1 = v.verify({ identity: "", state: {}, declaredHash: hashOf({}), braidSignature: "sha256:x", spineSignature: SPINE_SIG, priorAuditHash: "GENESIS", allowGenesis: true } as never);
+  const r1 = v.verify({ identity: "", state: {}, declaredHash: hashOf({}), braidBindingHash: "sha256:x", spineSignature: SPINE_SIG, priorAuditHash: "GENESIS", allowGenesis: true } as never);
   assert.equal(r1.trusted, false);
   assert.ok(r1.failedLayers.includes("identity"));
-  const r2 = v.verify({ state: {}, declaredHash: hashOf({}), braidSignature: "sha256:x", spineSignature: SPINE_SIG, priorAuditHash: "GENESIS" } as never);
+  const r2 = v.verify({ state: {}, declaredHash: hashOf({}), braidBindingHash: "sha256:x", spineSignature: SPINE_SIG, priorAuditHash: "GENESIS" } as never);
   assert.equal(r2.trusted, false);
   assert.ok(r2.failedLayers.includes("identity"));
 });

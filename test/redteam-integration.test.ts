@@ -10,7 +10,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AuditLedger, BraidedRuntime } from "../src";
-import { BctVerifier, computeBraidSignature } from "../src/truth/BctVerifier";
+import { BctVerifier, computeBraidBindingHash } from "../src/truth/BctVerifier";
 import { hashOf } from "../src/utils/hash";
 import { fixedClock } from "../src/utils/time";
 
@@ -51,7 +51,7 @@ test("redteam integration: intent → spine → brain → memory → ledger → 
     identity: response.traceId,
     state,
     declaredHash,
-    braidSignature: computeBraidSignature(declaredHash, spineSignature),
+    braidBindingHash: computeBraidBindingHash(declaredHash, spineSignature),
     spineSignature,
     priorAuditHash: ledger.latestHash(),
     allowGenesis: true

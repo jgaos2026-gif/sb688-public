@@ -30,6 +30,19 @@ export interface BraidedRuntimeDeps {
    * never erased by a rollback, so there is nothing to restore here.
    */
   readonly rollbackParticipants?: readonly import("../failure/FailureManager").RollbackParticipant[];
+  /**
+   * Fail visibly when no durable spine signing key is configured
+   * (round 3 — passed to the default SpineGovernor as
+   * `requireDurableKey`). Ignored when the caller injects their own
+   * `spine` governor, which owns its own key configuration.
+   */
+  readonly requireDurableSpineKey?: boolean;
+  /**
+   * Durable permit-replay store path (round 3 — passed to the default
+   * truth mesh). Ignored when the caller injects their own `truth`
+   * mesh, which owns its own replay configuration.
+   */
+  readonly permitReplayStorePath?: string;
 }
 
 export class BraidedRuntime {
@@ -49,8 +62,8 @@ export class BraidedRuntime {
     // The mesh verifies permits against THIS governor's public key, so a
     // permit signed by any other key (or by nobody) fails pre-brain.
     // A caller-injected truth mesh is responsible for its own key.
-    this.spine = deps.spine ?? new SpineGovernor(undefined, { clock: this.clock });
-    this.truth = deps.truth ?? new LiquidTruthNodeMesh(undefined, { publicKey: this.spine.spinePublicKey, clock: this.clock });
+    this.spine = deps.spine ?? new SpineGovernor(undefined, { clock: this.clock, requireDurableKey: deps.requireDurableSpineKey });
+    this.truth = deps.truth ?? new LiquidTruthNodeMesh(undefined, { publicKey: this.spine.spinePublicKey, clock: this.clock, replayStorePath: deps.permitReplayStorePath });
     this.conscious = deps.conscious ?? new ConsciousBrick();
     this.stem = deps.stem ?? new StemTriBraid();
     this.brain = deps.brain ?? new DefaultBrainAdapter();

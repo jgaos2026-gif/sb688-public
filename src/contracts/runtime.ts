@@ -117,7 +117,28 @@ export interface RuntimeResponse {
   readonly verified: boolean;
   readonly auditHash: string;
   readonly checkpoint?: GhostCheckpoint;
+  /**
+   * Rollback mode for a failure-recovery response (finding E, round 3).
+   * Absent on normal (non-recovery) responses. See `RollbackMode`.
+   */
+  readonly rollbackMode?: RollbackMode;
 }
+
+/**
+ * Explicit rollback outcome (finding E, round 3). A rollback result
+ * must NEVER claim a verified restore when no restore was performed:
+ *
+ *   - NO_MUTABLE_PARTICIPANTS — no mutable participants were
+ *     registered, so there was no mutable state to restore. This is
+ *     the honest report for a runtime whose components are all
+ *     append-only; it is NOT a verified restore.
+ *   - RESTORE_VERIFIED — actual required participants were restored
+ *     and their restored state hashes matched the captured hashes.
+ *   - RESTORE_FAILED — a restore was attempted and could not be
+ *     demonstrated (missing capture, restore refused, hash mismatch,
+ *     corrupt chain, or snapshot not in the ledger).
+ */
+export type RollbackMode = "NO_MUTABLE_PARTICIPANTS" | "RESTORE_VERIFIED" | "RESTORE_FAILED";
 
 export interface RuntimeSnapshot {
   readonly traceId: string;

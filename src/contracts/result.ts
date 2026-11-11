@@ -77,6 +77,8 @@ export type RuntimeErrorCode =
   | "BCT_BRAID_FAILED"
   | "BCT_TRANSACTION_FAILED"
   | "BCT_AUDIT_FAILED"
+  | "REPLAY_REJECTED"
+  | "REPLAY_STORE_FAILED"
   | "UNKNOWN";
 
 export interface RuntimeError {

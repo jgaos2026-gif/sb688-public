@@ -14,7 +14,7 @@ import { PhoenixRecovery } from "../src/phoenix/PhoenixRecovery";
 import { PhoenixPatrol } from "../src/phoenix/PhoenixPatrol";
 import { TriadCoordinator } from "../src/triad/TriadCoordinator";
 import { PairedNodeSystem } from "../src/paired/PairedNodeSystem";
-import { BctVerifier, computeBraidSignature } from "../src/truth/BctVerifier";
+import { BctVerifier, computeBraidBindingHash } from "../src/truth/BctVerifier";
 import { UploadSentinel } from "../src/upload/UploadSentinel";
 import { FileUploadManager } from "../src/upload/FileUploadManager";
 import { hashOf } from "../src/utils/hash";
@@ -132,7 +132,7 @@ test("regression tampering: braid signature mismatch detected by BCT verifier", 
     identity: "tamper-test",
     state: SEED,
     declaredHash: hashOf(SEED),
-    braidSignature: "sha256:tampered-braid-signature",
+    braidBindingHash: "sha256:tampered-braid-signature",
     spineSignature: SPINE_SIG,
     priorAuditHash: "GENESIS"
   });
@@ -334,7 +334,7 @@ test("regression determinism: phoenix replay produces same final hash across rer
 test("regression determinism: bct verification is idempotent", () => {
   const state = { ...SEED };
   const declaredHash = hashOf(state);
-  const braidSignature = computeBraidSignature(declaredHash, SPINE_SIG);
+  const braidBindingHash = computeBraidBindingHash(declaredHash, SPINE_SIG);
 
   const hashes: string[] = [];
   for (let i = 0; i < 5; i++) {
@@ -343,7 +343,7 @@ test("regression determinism: bct verification is idempotent", () => {
       identity: "idem-test",
       state,
       declaredHash,
-      braidSignature,
+      braidBindingHash,
       spineSignature: SPINE_SIG,
       priorAuditHash: "GENESIS"
     });

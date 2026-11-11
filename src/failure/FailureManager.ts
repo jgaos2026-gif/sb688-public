@@ -1,6 +1,6 @@
 import type { AuditLedger } from "../ledger/AuditLedger";
 import type { RuntimeError, RuntimeStage } from "../contracts/result";
-import type { GhostCheckpoint, RollbackParticipantState, RuntimeResponse, RuntimeSnapshot, UserIntent } from "../contracts/runtime";
+import type { GhostCheckpoint, RollbackMode, RollbackParticipantState, RuntimeResponse, RuntimeSnapshot, UserIntent } from "../contracts/runtime";
 import { LiquidTruthNodeMesh } from "../truth/LiquidTruthNodeMesh";
 import { GhostNode, responseState } from "../ghost/GhostNode";
 import { hashOf } from "../utils/hash";
@@ -98,7 +98,7 @@ export class FailureManager {
       to: "failure.rollback",
       status: "started",
       at: this.clock(),
-      detail: { rollbackTo: lastStableSnapshot.stage, rollbackAuditHash: lastStableSnapshot.auditHash }
+      detail: { rollbackTo: lastStableSnapshot.stage, rollbackAuditHash: lastStableSnapshot.auditHash, rollbackMode: rollback.mode }
     });
 
     this.ledger.append({
@@ -109,6 +109,7 @@ export class FailureManager {
       at: this.clock(),
       detail: {
         mode: "degraded-recovery",
+        rollbackMode: rollback.mode,
         rollbackVerified: rollback.verified,
         snapshotInChain: rollback.snapshotInChain,
         chainValid: rollback.chainValid,
@@ -122,9 +123,11 @@ export class FailureManager {
     const body = [
       "Runtime recovered in degraded mode after a failure loop.",
       `Detected: ${error.code} at ${error.stage}.`,
-      rollback.verified
+      rollback.mode === "RESTORE_VERIFIED"
         ? `Rolled back to stable stage: ${lastStableSnapshot.stage} (rollback verified: restored state hashes match the checkpoint).`
-        : `Rolled back to stable stage: ${lastStableSnapshot.stage} — ROLLBACK NOT VERIFIED (${rollback.reason}); the failure was isolated but the restored state could not be demonstrated.`,
+        : rollback.mode === "NO_MUTABLE_PARTICIPANTS"
+          ? `Rolled back to stable stage: ${lastStableSnapshot.stage} — no mutable participants were registered, so there was no mutable state to restore (rollback mode: NO_MUTABLE_PARTICIPANTS; this is NOT a verified restore).`
+          : `Rolled back to stable stage: ${lastStableSnapshot.stage} — ROLLBACK NOT VERIFIED (${rollback.reason}); the failure was isolated but the restored state could not be demonstrated.`,
       "Restitched response: the requested execution could not complete normally, but the failure was isolated, rollback was applied, verification ran, and the ledger was updated."
     ].join("\n");
 
@@ -175,6 +178,7 @@ export class FailureManager {
             confidence: recoveryTruth.ok ? recoveryTruth.value.confidence : 0,
             meshSignature: recoveryTruth.ok ? recoveryTruth.value.meshSignature : "none",
             recoveryTruthOk: true,
+            rollbackMode: rollback.mode,
             rollbackVerified: true,
             chainValid: true,
             checkpointVerified: true
@@ -182,6 +186,7 @@ export class FailureManager {
         : {
             error: recoveryTruth.ok ? undefined : recoveryTruth.error.message,
             recoveryTruthOk: recoveryTruth.ok,
+            rollbackMode: rollback.mode,
             rollbackVerified: rollback.verified,
             chainValid,
             checkpointVerified,
@@ -195,7 +200,7 @@ export class FailureManager {
       to: "failure.log",
       status: verified ? "passed" : "failed",
       at: this.clock(),
-      detail: { originalError: error.code, chainValid: this.ledger.verifyChain(), rollbackVerified: rollback.verified, checkpointVerified }
+      detail: { originalError: error.code, chainValid: this.ledger.verifyChain(), rollbackMode: rollback.mode, rollbackVerified: rollback.verified, checkpointVerified }
     });
 
     const response: RuntimeResponse = {
@@ -203,7 +208,8 @@ export class FailureManager {
       output,
       verified,
       auditHash: this.ledger.latestHash(),
-      checkpoint
+      checkpoint,
+      rollbackMode: rollback.mode
     };
 
     this.ledger.append({
@@ -229,11 +235,21 @@ export class FailureManager {
 
   /**
    * Perform (and verify) the rollback. Returns verified:true only when
-   * every check passes: the chain is intact, the snapshot's audit hash
-   * is really present in the ledger, and every registered participant
-   * restored to a state whose hash matches its capture.
+   * every applicable check passes — and reports an explicit MODE, so a
+   * rollback with no participants can never be mistaken for a verified
+   * restore (finding E):
+   *
+   *   - NO_MUTABLE_PARTICIPANTS: no participants were registered, so
+   *     there was nothing to restore. `verified` here reflects only
+   *     the checks that apply (chain intact, snapshot in the ledger);
+   *     the mode itself says no restore was demonstrated.
+   *   - RESTORE_VERIFIED: actual required participants were restored
+   *     and their restored hashes matched the captured hashes.
+   *   - RESTORE_FAILED: a restore was attempted and could not be
+   *     demonstrated. `verified` is false.
    */
   private performRollback(snapshot: RuntimeSnapshot): {
+    readonly mode: RollbackMode;
     readonly verified: boolean;
     readonly reason: string;
     readonly snapshotInChain: boolean;
@@ -244,6 +260,27 @@ export class FailureManager {
     const snapshotInChain =
       snapshot.auditHash === "GENESIS" ||
       this.ledger.entries().some((entry) => entry.hash === snapshot.auditHash);
+
+    // FINDING E — the empty-participant case. `[].every(...)` is true,
+    // so the old code reported a verified rollback when nothing had
+    // been restored at all. Say so explicitly instead.
+    if (this.rollbackParticipants.length === 0) {
+      const reasons: string[] = [];
+      if (!chainValid) reasons.push("audit chain is not valid");
+      if (!snapshotInChain) reasons.push("snapshot audit hash is not present in the ledger");
+      return {
+        mode: "NO_MUTABLE_PARTICIPANTS",
+        verified: reasons.length === 0,
+        reason:
+          reasons.length === 0
+            ? "no mutable participants registered — there was no mutable state to restore"
+            : `no mutable participants registered; applicable checks failed: ${reasons.join("; ")}`,
+        snapshotInChain,
+        chainValid,
+        checks: []
+      };
+    }
+
     const checks: RollbackCheck[] = this.rollbackParticipants.map((participant) => {
       const recorded: RollbackParticipantState | undefined =
         snapshot.participantStates?.[participant.name];
@@ -290,9 +327,11 @@ export class FailureManager {
     for (const check of checks) {
       if (!check.restored || !check.hashMatches) reasons.push(`${check.name}: ${check.reason}`);
     }
+    const verified = reasons.length === 0;
     return {
-      verified: reasons.length === 0,
-      reason: reasons.length === 0 ? "all rollback checks passed" : reasons.join("; "),
+      mode: verified ? "RESTORE_VERIFIED" : "RESTORE_FAILED",
+      verified,
+      reason: verified ? "all rollback checks passed" : reasons.join("; "),
       snapshotInChain,
       chainValid,
       checks

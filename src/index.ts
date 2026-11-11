@@ -28,4 +28,8 @@ export * from "./phoenix";
 export * from "./triad";
 export * from "./paired";
 export * from "./truth/BctVerifier";
+export * from "./truth/EvidenceLedgerCrossCheck";
+export * from "./truth/PermitReplayStore";
+export * from "./utils/fileLock";
+export * from "./utils/hash";
 export * from "./safety";

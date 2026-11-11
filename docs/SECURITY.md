@@ -31,6 +31,42 @@
   deployments should still use operator-managed key custody and
   signing policies (HSM/KMS-backed operations).
 
+## Round 3 hardening (2026-11-10)
+
+- **Braid binding, not a braid "signature".** The BCT braid value is
+  an unkeyed SHA-256 hash (`braidBindingHash`) — it proves the values
+  match and authenticates nobody. It is named as a binding
+  everywhere in `BctVerifier` so no reader mistakes it for
+  authentication. Real issuer authentication lives in the Ed25519
+  permit signatures (`SpinePermitCrypto`). The Stem braid value
+  (`StemPacket.braidSignature`) and the Phoenix patrol hash map are
+  separate components and still carry the old name — see the round-3
+  report.
+- **Ledger: disk before memory, single writer.** Appends write +
+  fsync before publishing to memory; a failed write leaves memory
+  untouched. File-backed ledgers serialize verify+append through an
+  OS-level lockfile, sync with the file under the lock on every
+  append, and recover a torn final line by truncation on load.
+- **Trust is conditional on the durable audit commit.** The BCT head
+  advances only after the ledger append succeeds; a failed commit
+  means `trusted: false` and the head does not move.
+- **Rollback modes are explicit.** `NO_MUTABLE_PARTICIPANTS` /
+  `RESTORE_VERIFIED` / `RESTORE_FAILED` — a run with no mutable
+  participants never claims a verified restore.
+- **Durable permit replay.** Used permit signatures can be persisted
+  (`replayStorePath`) and are re-checked from disk, so a replay
+  after restart is rejected.
+- **Keys fail visibly.** `SpineGovernor({ requireDurableKey: true })`
+  throws at startup when no durable key is configured; the default
+  ephemeral key is labeled `keyProvenance: "ephemeral"`.
+- **Evidence-ledger cross-check.** `BctVerifier` optionally verifies
+  the local head against a durable evidence ledger (Supabase table)
+  — see `docs/EVIDENCE_LEDGER_CROSS_CHECK.md`. Not wired to any live
+  project in this repo.
+- **Shared canonical numbers.** `stableStringify`/`hashOf` use the
+  cross-language canonical numeric form (see `src/utils/hash.ts`),
+  and reject non-finite numbers instead of hashing them as `null`.
+
 ## Reporting
 
 Vulnerability reports: contact the Architect through the channel

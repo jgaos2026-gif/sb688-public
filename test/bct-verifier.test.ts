@@ -7,7 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AuditLedger } from "../src/ledger/AuditLedger";
-import { BctVerifier, computeBraidSignature, computeTransitionHash } from "../src/truth/BctVerifier";
+import { BctVerifier, computeBraidBindingHash, computeTransitionHash } from "../src/truth/BctVerifier";
 import { hashOf } from "../src/utils/hash";
 import { fixedClock } from "../src/utils/time";
 
@@ -22,12 +22,12 @@ function makeVerifier(): { v: BctVerifier; ledger: AuditLedger } {
 
 function validInput(overrides: Partial<Parameters<BctVerifier["verify"]>[0]> = {}) {
   const declaredHash = hashOf(STATE);
-  const braidSignature = computeBraidSignature(declaredHash, SPINE_SIG);
+  const braidBindingHash = computeBraidBindingHash(declaredHash, SPINE_SIG);
   return {
     identity: "intent-001",
     state: STATE,
     declaredHash,
-    braidSignature,
+    braidBindingHash,
     spineSignature: SPINE_SIG,
     priorAuditHash: "GENESIS",
     requiredKeys: ["protocol", "version", "owner"],
@@ -59,12 +59,12 @@ test("bct: schema layer fails when required key is missing", () => {
   const { v } = makeVerifier();
   const partialState = { protocol: "SB689", version: 1 } as Record<string, unknown>;
   const declaredHash = hashOf(partialState);
-  const braidSignature = computeBraidSignature(declaredHash, SPINE_SIG);
+  const braidBindingHash = computeBraidBindingHash(declaredHash, SPINE_SIG);
 
   const result = v.verify(validInput({
     state: partialState,
     declaredHash,
-    braidSignature,
+    braidBindingHash,
     requiredKeys: ["protocol", "version", "owner"]
   }));
 
@@ -82,7 +82,7 @@ test("bct: crypto layer fails when declared hash does not match actual state has
 
 test("bct: braid layer fails when signature is wrong", () => {
   const { v } = makeVerifier();
-  const result = v.verify(validInput({ braidSignature: "sha256:badbadbadbad" }));
+  const result = v.verify(validInput({ braidBindingHash: "sha256:badbadbadbad" }));
 
   assert.equal(result.trusted, false);
   assert.ok(result.failedLayers.includes("braid"));
@@ -174,14 +174,14 @@ test("bct: audit layer fails when ledger chain is inconsistent with prior hash",
   const v = new BctVerifier(ledger, fixedClock(AT));
 
   const declaredHash = hashOf(STATE);
-  const braidSignature = computeBraidSignature(declaredHash, SPINE_SIG);
+  const braidBindingHash = computeBraidBindingHash(declaredHash, SPINE_SIG);
 
   // priorAuditHash is GENESIS but ledger no longer has GENESIS as latest.
   const result = v.verify({
     identity: "test",
     state: STATE,
     declaredHash,
-    braidSignature,
+    braidBindingHash,
     spineSignature: SPINE_SIG,
     priorAuditHash: "GENESIS",
     requiredKeys: []
@@ -221,7 +221,7 @@ test("bct: multiple independent states each produce distinct final hashes", () =
     identity: "a",
     state: stateA,
     declaredHash: hashA,
-    braidSignature: computeBraidSignature(hashA, SPINE_SIG),
+    braidBindingHash: computeBraidBindingHash(hashA, SPINE_SIG),
     spineSignature: SPINE_SIG,
     priorAuditHash: "GENESIS",
     allowGenesis: true
@@ -231,7 +231,7 @@ test("bct: multiple independent states each produce distinct final hashes", () =
     identity: "b",
     state: stateB,
     declaredHash: hashB,
-    braidSignature: computeBraidSignature(hashB, SPINE_SIG),
+    braidBindingHash: computeBraidBindingHash(hashB, SPINE_SIG),
     spineSignature: SPINE_SIG,
     priorAuditHash: r1.auditHash,
     allowGenesis: true
@@ -242,9 +242,9 @@ test("bct: multiple independent states each produce distinct final hashes", () =
   assert.equal(r2.trusted, true);
 });
 
-test("computeBraidSignature: is deterministic", () => {
-  const h1 = computeBraidSignature("sha256:abc", "sha256:def");
-  const h2 = computeBraidSignature("sha256:abc", "sha256:def");
+test("computeBraidBindingHash: is deterministic", () => {
+  const h1 = computeBraidBindingHash("sha256:abc", "sha256:def");
+  const h2 = computeBraidBindingHash("sha256:abc", "sha256:def");
   assert.equal(h1, h2);
   assert.ok(h1.startsWith("sha256:"));
 });

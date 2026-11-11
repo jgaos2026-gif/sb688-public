@@ -1,7 +1,8 @@
-import { hashOf } from "../utils/hash";
+import { hashOf, isWellFormedHash } from "../utils/hash";
 import type { AuditLedger } from "../ledger/AuditLedger";
 import type { Clock } from "../utils/time";
 import { systemClock } from "../utils/time";
+import { verifyHeadAgainstLedger, type EvidenceLedgerReader } from "./EvidenceLedgerCrossCheck";
 
 /**
  * BCT Verifier — Phase 6 Braided Computational Topology verification layers.
@@ -11,7 +12,14 @@ import { systemClock } from "../utils/time";
  *   1. Identity verification   — subject has a valid, non-empty identity
  *   2. Schema verification     — state conforms to required structure
  *   3. Cryptographic verification — hash integrity matches declared hash
- *   4. Braid verification      — braid signature binds state to governance chain
+ *   4. Braid verification      — an unkeyed SHA-256 BINDING hash ties the
+ *      state to the governance chain. It is a binding, not a signature:
+ *      anyone who knows the values can compute it, so it proves the
+ *      values match and authenticates NOBODY. It is named
+ *      `braidBindingHash` everywhere for exactly that reason (finding F).
+ *      Where issuer authentication is actually required, the permit
+ *      layer uses real Ed25519 signatures (SpinePermitCrypto) — there
+ *      is no such place in this file, so the rename alone is the fix.
  *   5. Transaction verification — the transition itself is valid: the new
  *      state's hash must be chained to the prior state's hash, and a no-op
  *      transition (new hash equals prior hash) is never certified as a new
@@ -48,6 +56,21 @@ import { systemClock } from "../utils/time";
  * mistyped, or structurally wrong input returns a structured rejection
  * (trusted:false, every layer failed with a message) instead of an
  * exception. Callers gate on `trusted`, never on try/catch.
+ *
+ * FINDING D — trust is conditional on the durable audit commit: the
+ * registered head advances ONLY after the ledger append for the
+ * verification succeeds. If the append fails, the result is
+ * trusted:false (the audit layer is marked failed) and the head does
+ * not move — a transition that was never durably recorded must never
+ * be trusted or become the next transition's parent.
+ *
+ * FINDING H — head anchoring still depends on operator-controlled
+ * state (the registry). When an evidence-ledger reader is supplied
+ * (4th constructor argument), the audit layer additionally requires
+ * the durable evidence ledger to agree with the local head — see
+ * src/truth/EvidenceLedgerCrossCheck.ts and
+ * docs/EVIDENCE_LEDGER_CROSS_CHECK.md. Without a reader, behaviour
+ * is unchanged.
  */
 
 export interface BctVerificationInput {
@@ -57,9 +80,18 @@ export interface BctVerificationInput {
   readonly state: Readonly<Record<string, unknown>>;
   /** The expected/declared hash of the state (from a trusted source). */
   readonly declaredHash: string;
-  /** The braid signature that should bind this state. */
-  readonly braidSignature: string;
-  /** The governance chain root (spine signature) that authorized this state. */
+  /**
+   * The braid BINDING hash that ties this state to the governance
+   * chain, computed as hashOf({ stateHash: declaredHash,
+   * spineSignature }). It is an UNKEYED SHA-256 hash, not a
+   * signature: anyone knowing the values can compute it, so it
+   * proves the values match and authenticates nobody. It is named
+   * `braidBindingHash` (not `braidSignature`) so no reader mistakes
+   * it for authentication. Where issuer authentication is required,
+   * use the Ed25519 permit signature (SpinePermitCrypto), not this.
+   */
+  readonly braidBindingHash: string;
+  /** The governance chain value (content binding) that authorized this state. */
   readonly spineSignature: string;
   /** Previously known audit hash at the start of this transition. */
   readonly priorAuditHash: string;
@@ -129,8 +161,21 @@ export class BctHeadRegistry {
    * seed only from a durable record you trust (e.g. the last verified
    * state hash from storage). Seeding from caller-supplied input
    * defeats the anchoring — never do that.
+   *
+   * VALIDATION (round 3): the identity must be a non-empty string and
+   * the hash must be well-formed (`sha256:` + 64 lowercase hex chars).
+   * Anything else throws a structured REGISTRY_REJECTED error instead
+   * of silently recording an unusable head.
    */
   register(identity: string, stateHash: string): void {
+    if (typeof identity !== "string" || identity.trim().length === 0) {
+      throw new Error("REGISTRY_REJECTED: identity must be a non-empty string.");
+    }
+    if (!isWellFormedHash(stateHash)) {
+      throw new Error(
+        `REGISTRY_REJECTED: state hash must be a well-formed 'sha256:' + 64 lowercase hex chars; got ${JSON.stringify(stateHash)}.`
+      );
+    }
     this.heads.set(identity, stateHash);
   }
 
@@ -138,8 +183,15 @@ export class BctHeadRegistry {
    * Advance the head after a trusted transition. Returns false (and
    * changes nothing) unless the recorded head equals the expected prior
    * — so a competing branch can never silently overwrite the head.
+   * A malformed new hash throws REGISTRY_REJECTED (same validation as
+   * register()).
    */
   advance(identity: string, expectedPrior: string, newHash: string): boolean {
+    if (!isWellFormedHash(newHash)) {
+      throw new Error(
+        `REGISTRY_REJECTED: new head hash must be a well-formed 'sha256:' + 64 lowercase hex chars; got ${JSON.stringify(newHash)}.`
+      );
+    }
     if (this.heads.get(identity) !== expectedPrior) return false;
     this.heads.set(identity, newHash);
     return true;
@@ -152,11 +204,25 @@ export class BctVerifier {
   private readonly ledger: AuditLedger;
   private readonly clock: Clock;
   private readonly registry: BctHeadRegistry;
+  private readonly evidenceLedger?: EvidenceLedgerReader;
 
-  constructor(ledger: AuditLedger, clock: Clock = systemClock, registry: BctHeadRegistry = new BctHeadRegistry()) {
+  /**
+   * @param evidenceLedger — optional evidence-ledger reader (finding H).
+   *   When set, the audit layer additionally requires the durable
+   *   evidence ledger to agree with the local head. See
+   *   src/truth/EvidenceLedgerCrossCheck.ts. Default: none (behaviour
+   *   unchanged).
+   */
+  constructor(
+    ledger: AuditLedger,
+    clock: Clock = systemClock,
+    registry: BctHeadRegistry = new BctHeadRegistry(),
+    evidenceLedger?: EvidenceLedgerReader
+  ) {
     this.ledger = ledger;
     this.clock = clock;
     this.registry = registry;
+    this.evidenceLedger = evidenceLedger;
   }
 
   /** Seed a known chain head (operator/caller trust action — see BctHeadRegistry). */
@@ -215,24 +281,21 @@ export class BctVerifier {
     // ── Layer 6: Audit ────────────────────────────────────────────────────────
     layers.push(this.layerAudit(input));
 
-    const failedLayers = layers.filter((l) => !l.passed).map((l) => l.layer);
-    const trusted = failedLayers.length === 0;
-    const finalHash = hashOf({
+    let failedLayers = layers.filter((l) => !l.passed).map((l) => l.layer);
+    let trusted = failedLayers.length === 0;
+    let finalHash = hashOf({
       input: { identity: typeof input.identity === "string" ? input.identity : null, declaredHash: typeof input.declaredHash === "string" ? input.declaredHash : null },
       layers
     });
 
-    // On a trusted transition the registered head advances to the new
-    // state — the next transition must chain from THIS state, so an old
-    // parent or a competing branch is rejected from here on.
-    if (trusted && typeof input.identity === "string" && typeof input.declaredHash === "string") {
-      if (input.priorStateHash === undefined || input.priorStateHash === "GENESIS") {
-        this.registry.register(input.identity, input.declaredHash);
-      } else {
-        this.registry.advance(input.identity, input.priorStateHash, input.declaredHash);
-      }
-    }
-
+    // FINDING D — the audit commit is part of trust, and it happens
+    // BEFORE the head advances. The ledger entry is appended with the
+    // layers' verdict; only if that append succeeds may a trusted
+    // transition advance the registry. If the append fails, the
+    // transition is NOT trusted (the audit layer is marked failed so
+    // failedLayers says so) and the head does not move — a transition
+    // that was never durably recorded must never become the next
+    // transition's parent.
     let ledgerAppendFailed = false;
     try {
       this.ledger.append({
@@ -252,6 +315,32 @@ export class BctVerifier {
       // The ledger failed closed (e.g. corrupt chain refused the append).
       // Report it on the result; never throw out of the verifier.
       ledgerAppendFailed = true;
+      if (trusted) {
+        trusted = false;
+        layers[5] = {
+          layer: "audit",
+          passed: false,
+          message: "Audit ledger append failed — the verification was not durably recorded, so the transition is not trusted and the chain head does not advance.",
+          detail: { chainValid: layers[5].detail?.chainValid, priorAuditHash: typeof input.priorAuditHash === "string" ? input.priorAuditHash : null, latestAuditHash: this.ledger.latestHash() }
+        };
+        failedLayers = layers.filter((l) => !l.passed).map((l) => l.layer);
+        finalHash = hashOf({
+          input: { identity: typeof input.identity === "string" ? input.identity : null, declaredHash: typeof input.declaredHash === "string" ? input.declaredHash : null },
+          layers
+        });
+      }
+    }
+
+    // On a trusted transition the registered head advances to the new
+    // state — the next transition must chain from THIS state, so an old
+    // parent or a competing branch is rejected from here on. This runs
+    // ONLY after the audit commit above succeeded (finding D).
+    if (trusted && typeof input.identity === "string" && typeof input.declaredHash === "string") {
+      if (input.priorStateHash === undefined || input.priorStateHash === "GENESIS") {
+        this.registry.register(input.identity, input.declaredHash);
+      } else {
+        this.registry.advance(input.identity, input.priorStateHash, input.declaredHash);
+      }
     }
 
     return Object.freeze({
@@ -303,7 +392,11 @@ export class BctVerifier {
       };
     }
     const required = input.requiredKeys ?? [];
-    const missing = required.filter((k) => !(k in input.state));
+    // Object.hasOwn, not `in`: `in` accepts INHERITED properties, so a
+    // state created via Object.create({ key }) would pass a schema
+    // check for a key it does not own. A required key must be the
+    // state's own property.
+    const missing = required.filter((k) => !Object.hasOwn(input.state, k));
     const passed = missing.length === 0;
     return {
       layer: "schema",
@@ -337,27 +430,29 @@ export class BctVerifier {
   }
 
   private layerBraid(input: BctVerificationInput): BctLayerResult {
-    if (typeof input.braidSignature !== "string" || typeof input.spineSignature !== "string") {
+    if (typeof input.braidBindingHash !== "string" || typeof input.spineSignature !== "string") {
       return {
         layer: "braid",
         passed: false,
-        message: "Braid or spine signature is missing or not a string.",
-        detail: { braidSignature: typeof input.braidSignature === "string" ? input.braidSignature : null }
+        message: "Braid binding hash or spine value is missing or not a string.",
+        detail: { braidBindingHash: typeof input.braidBindingHash === "string" ? input.braidBindingHash : null }
       };
     }
-    // Braid signature must start with sha256: and bind the state hash and spine.
-    const wellFormed = input.braidSignature.startsWith("sha256:");
-    // Verify the braid signature encodes the state hash deterministically.
-    // The canonical braid signature must equal hashOf({ state, spine }).
+    // Braid binding hash must start with sha256: and bind the state hash and spine.
+    const wellFormed = input.braidBindingHash.startsWith("sha256:");
+    // Verify the braid binding hash encodes the state hash deterministically.
+    // The canonical braid binding hash must equal hashOf({ state, spine }).
+    // It is an UNKEYED hash — it proves the values match; it does NOT
+    // authenticate the issuer. Never call it a signature.
     const canonical = hashOf({ stateHash: input.declaredHash, spineSignature: input.spineSignature });
-    const passed = wellFormed && input.braidSignature === canonical;
+    const passed = wellFormed && input.braidBindingHash === canonical;
     return {
       layer: "braid",
       passed,
       message: passed
-        ? "Braid signature binds state to governance chain."
-        : "Braid signature is invalid or does not bind this state.",
-      detail: { braidSignature: input.braidSignature, canonical, wellFormed }
+        ? "Braid binding hash ties state to governance chain (unkeyed binding — proves the values match, authenticates nobody)."
+        : "Braid binding hash is invalid or does not bind this state.",
+      detail: { braidBindingHash: input.braidBindingHash, canonical, wellFormed }
     };
   }
 
@@ -461,20 +556,59 @@ export class BctVerifier {
     // priorAuditHash must exactly match the current ledger head.
     // When the ledger is empty, latestHash() returns "GENESIS".
     const priorHashMatch = typeof input.priorAuditHash === "string" && latestAuditHash === input.priorAuditHash;
-    const passed = chainValid && priorHashMatch;
+
+    // FINDING H — evidence-ledger cross-check (only when a reader is
+    // configured). The local head must agree with the durable
+    // evidence ledger, or the transition is not trusted:
+    //   - chained transition: the ledger's head must EQUAL the prior
+    //     head (a stale local head or a fork is rejected);
+    //   - genesis transition: the ledger must have NO record for the
+    //     identity (an identity with a durable head can never start
+    //     over).
+    let crossCheckPassed = true;
+    let crossCheckMessage = "No evidence-ledger reader configured — cross-check skipped (local anchoring only).";
+    let crossCheckOutcome: string | undefined;
+    if (this.evidenceLedger && typeof input.identity === "string" && input.identity) {
+      const priorHead = !input.priorStateHash || input.priorStateHash === "GENESIS" ? "GENESIS" : input.priorStateHash;
+      const check = verifyHeadAgainstLedger(input.identity, priorHead, this.evidenceLedger);
+      crossCheckOutcome = check.outcome;
+      if (priorHead === "GENESIS") {
+        crossCheckPassed = check.outcome === "NO_LEDGER_RECORD";
+        crossCheckMessage = crossCheckPassed
+          ? "Evidence ledger has no prior head for this identity — genesis is consistent with the durable record."
+          : `Evidence ledger already records a head for this identity (${check.ledgerHead}) — genesis would fork the durable chain.`;
+      } else {
+        crossCheckPassed = check.outcome === "MATCH";
+        crossCheckMessage = crossCheckPassed
+          ? "Local head matches the head recorded in the evidence ledger."
+          : check.reason;
+      }
+    }
+
+    const passed = chainValid && priorHashMatch && crossCheckPassed;
     return {
       layer: "audit",
       passed,
       message: passed
-        ? "Audit ledger chain is intact and prior hash matches."
-        : "Audit ledger chain is broken or prior hash mismatch.",
-      detail: { chainValid, priorAuditHash: typeof input.priorAuditHash === "string" ? input.priorAuditHash : null, latestAuditHash }
+        ? "Audit ledger chain is intact, prior hash matches, and the evidence-ledger cross-check passed."
+        : `Audit ledger chain is broken, prior hash mismatch, or evidence-ledger cross-check failed. ${crossCheckMessage}`,
+      detail: {
+        chainValid,
+        priorAuditHash: typeof input.priorAuditHash === "string" ? input.priorAuditHash : null,
+        latestAuditHash,
+        ...(crossCheckOutcome ? { crossCheckOutcome, crossCheckMessage } : {})
+      }
     };
   }
 }
 
-/** Helper: compute the canonical braid signature for use with BctVerifier. */
-export function computeBraidSignature(stateHash: string, spineSignature: string): string {
+/**
+ * Helper: compute the canonical braid BINDING hash for use with
+ * BctVerifier. It is an unkeyed SHA-256 hash of { stateHash,
+ * spineSignature } — it binds the values together and authenticates
+ * nobody. Do not call it a signature.
+ */
+export function computeBraidBindingHash(stateHash: string, spineSignature: string): string {
   return hashOf({ stateHash, spineSignature });
 }
 

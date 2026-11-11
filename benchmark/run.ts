@@ -14,7 +14,7 @@ import { PhoenixRecovery } from "../src/phoenix/PhoenixRecovery";
 import { PhoenixPatrol } from "../src/phoenix/PhoenixPatrol";
 import { TriadCoordinator } from "../src/triad/TriadCoordinator";
 import { PairedNodeSystem } from "../src/paired/PairedNodeSystem";
-import { BctVerifier, computeBraidSignature } from "../src/truth/BctVerifier";
+import { BctVerifier, computeBraidBindingHash } from "../src/truth/BctVerifier";
 import { UploadSentinel } from "../src/upload/UploadSentinel";
 import { FileUploadManager } from "../src/upload/FileUploadManager";
 import { hashOf } from "../src/utils/hash";
@@ -171,7 +171,7 @@ async function main() {
     const ledger = new AuditLedger();
     const v = new BctVerifier(ledger, fixedClock(AT));
     const dh = hashOf(SEED);
-    v.verify({ identity: "bench", state: SEED, declaredHash: dh, braidSignature: computeBraidSignature(dh, SPINE_SIG), spineSignature: SPINE_SIG, priorAuditHash: "GENESIS" });
+    v.verify({ identity: "bench", state: SEED, declaredHash: dh, braidBindingHash: computeBraidBindingHash(dh, SPINE_SIG), spineSignature: SPINE_SIG, priorAuditHash: "GENESIS" });
   }));
 
   results.push(bench("UploadSentinel.scan (clean)", 1000, () => {
