@@ -67,3 +67,6 @@ and must pass SB688 verification before joining the stitch.
 
 ---
 The system combines cutting-edge tools to demonstrate "**Verification Before Trust.**"
+## System status and Triple Braid architecture
+
+This repository documents the **triple braid** governance model and its **spine proxy** boundary. The current local SB688 Stitch manifest is an offline content-binding check; it is not a remote peer connection or certification. See [STITCH_BRIDGE.md](STITCH_BRIDGE.md) for the connection contract and lifecycle. The system status endpoint reports process health and ledger validity, not proof of a live Stitch connection.
