@@ -21,10 +21,9 @@ jobs:
           node - <<'NODE'
           const body = process.env.PR_BODY || "";
           const required = [
-            "npm run build passes locally",
-            "npm test passes locally",
-            "npm run demo runs end-to-end without errors",
-            "No private / proprietary content added",
+            "npm run build passes in CI",
+            "npm test passes in CI",
+            "npm run demo runs end-to-end without errors in CI",
             "Brain remains adapter-only",
             "Audit ledger format remains append-only and hash-chained",
             "Evidence labels in `docs/WHITEPAPER.md` were not weakened"
