@@ -35,7 +35,7 @@ let totalSilent = 0;
 let totalRecoveryEscapes = 0;
 
 for (const industry of ENVIRONMENTS) {
-  const gate = new SuperHardeningGate(industry);
+  const gate = new SuperHardeningGate(industry, "super-hard-v1", () => true);
   const p = ENVIRONMENT_PROFILES[industry];
   const rng = seeded(0xa5a50000 ^ industry.length * 7919);
   let blocked = 0;
@@ -96,6 +96,12 @@ for (const industry of ENVIRONMENTS) {
         verified: true,
         validated: true,
         certifierIds: Array.from({ length: p.minIndependentCertifiers }, (_, i) => `certifier-${i + 1}`),
+        certifierProofs: Array.from({ length: p.minIndependentCertifiers }, (_, i) => ({
+          certifierId: `certifier-${i + 1}`,
+          keyId: `test-key-${i + 1}`,
+          signature: `test-signature-${i + 1}`,
+          payloadHash: "a".repeat(64)
+        })),
         checkpointPresent: true,
         evidencePreserved: true,
         policyVersion: "super-hard-v1",
