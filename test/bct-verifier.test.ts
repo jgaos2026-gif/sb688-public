@@ -7,7 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AuditLedger } from "../src/ledger/AuditLedger";
-import { BctVerifier, computeBraidBindingHash, computeTransitionHash } from "../src/truth/BctVerifier";
+import { BctHeadRegistry, BctVerifier, computeBraidBindingHash, computeTransitionHash } from "../src/truth/BctVerifier";
 import { hashOf } from "../src/utils/hash";
 import { fixedClock } from "../src/utils/time";
 
@@ -110,6 +110,30 @@ test("bct: transaction layer passes for a chained transition to a new state", ()
 
   const txLayer = result.layers.find((l) => l.layer === "transaction")!;
   assert.equal(txLayer.passed, true);
+});
+
+test("bct: trusted is false when authoritative head compare-and-set refuses", () => {
+  class RejectAdvanceRegistry extends BctHeadRegistry {
+    override advance(_identity: string, _expectedPrior: string, _newHash: string): boolean {
+      return false;
+    }
+  }
+  const ledger = new AuditLedger();
+  const registry = new RejectAdvanceRegistry();
+  const prior = hashOf({ previous: "state" });
+  registry.register("intent-001", prior);
+  const v = new BctVerifier(ledger, fixedClock(AT), registry);
+  const declaredHash = hashOf({ ...STATE, version: 2 });
+  const result = v.verify(validInput({
+    state: { ...STATE, version: 2 },
+    declaredHash,
+    braidBindingHash: computeBraidBindingHash(declaredHash, SPINE_SIG),
+    priorStateHash: prior,
+    transitionHash: computeTransitionHash(declaredHash, prior)
+  }));
+  assert.equal(result.trusted, false);
+  assert.ok(result.failedLayers.includes("transaction"));
+  assert.equal(registry.head("intent-001"), prior);
 });
 
 test("bct: transaction layer fails for an unchained transition (no transition hash)", () => {
