@@ -16,6 +16,7 @@ jobs:
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
       - name: Validate required PR checklist items are checked
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
@@ -37,7 +38,7 @@ jobs:
             const { execFileSync } = require("node:child_process");
             try {
               body = execFileSync("gh", ["pr", "list", "--state", "open",
-                "--head", process.env.PR_BRANCH, "--json", "body",
+                "--head", `${process.env.GITHUB_REPOSITORY_OWNER}:${process.env.PR_BRANCH}`, "--json", "body",
                 "--jq", ".[0].body"], { encoding: "utf8",
                 env: { ...process.env, GH_TOKEN: process.env.GH_TOKEN } });
             } catch {
