@@ -71,3 +71,8 @@ Generated during Phase 0–1 audit. Commit: `e530847`
 - It does not claim simulated drills prove physical, industrial, or production reliability.
 - It does not claim safety evaluations prove real AI systems cannot hallucinate.
 - Benchmark numbers reflect in-process Node.js timing only; they do not represent hardware or I/O-bound production performance.
+
+
+## Recovery capsule trust partition (2026-11-11)
+
+The recovery result retains separate `stitchState` and `memoryState` snapshots. A healthy, verified, validated first scan may renew a capsule with updated memory, but memory keys cannot override Stitch-owned control keys. A failed recovery or unhealthy scan cannot mint a replacement capsule. The combined `state` view is for consumers; renewal uses the separated partitions to preserve the authority boundary.
