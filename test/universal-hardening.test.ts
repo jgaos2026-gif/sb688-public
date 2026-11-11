@@ -1,11 +1,17 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { UniversalHardeningGate, ENVIRONMENT_PROFILES, DEFAULT_THREAT_MATRIX, type ArtifactCandidate, type ThreatClass, type Severity, type PromotionEvidence } from "../src/security/UniversalHardening";
+import { UniversalHardeningGate, ENVIRONMENT_PROFILES, DEFAULT_THREAT_MATRIX, type ArtifactCandidate, type ThreatClass, type Severity, type PromotionEvidence, type EnvironmentId } from "../src/security/UniversalHardening";
 
 function candidate(overrides: Partial<ArtifactCandidate> = {}): ArtifactCandidate {
   return { id: "artifact-1", sizeBytes: 1024, sourceId: "sensor-a", sourceAuthenticated: true, provenancePresent: true, observedAtMs: 1_000_000, currentTimeMs: 1_000_100, declaredPolicyVersion: "v1", currentPolicyVersion: "v1", evidenceIntact: true, ...overrides };
 }
 function signal(type: ThreatClass, severity: Severity = "HIGH", confidence = 0.9) { return { type, severity, confidence, detail: "fault injection", source: "test-harness" } as const; }
+
+const testVerifier = () => true;
+function gate(environment: EnvironmentId, policyVersion = "v1") {
+  return new UniversalHardeningGate(environment, policyVersion, testVerifier);
+}
+
 function evidence(overrides: Partial<PromotionEvidence> = {}): PromotionEvidence { return { verified: true, validated: true, certifierIds: ["v1","v2","v3"], certifierProofs: ["v1","v2","v3"].map((id) => ({ certifierId: id, keyId: `key-${id}`, signature: `sig-${id}`, payloadHash: "a".repeat(64) })), checkpointPresent: true, evidencePreserved: true, policyVersion: "v1", humanApprovedCriticalChange: true, ...overrides }; }
 
 test("purified candidate is never trusted or allowed to touch Spine", () => { const d = new UniversalHardeningGate("GENERAL").inspect(candidate()); assert.equal(d.state, "PURIFIED_CANDIDATE"); assert.equal(d.trusted, false); assert.equal(d.canTouchSpine, false); });
