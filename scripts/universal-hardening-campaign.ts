@@ -27,12 +27,12 @@ async function main(): Promise<void> {
     ["verify-false",{verified:false}], ["validate-false",{validated:false}], ["duplicate-certifier",{certifierIds:["c1","c1","c2"]}], ["no-checkpoint",{checkpointPresent:false}], ["erased-evidence",{evidencePreserved:false}], ["no-policy",{policyVersion:""}], ["no-human-approval",{humanApprovedCriticalChange:false}], ["unresolved-critical",{unresolvedSignals:[signal("UNKNOWN")]}]
   ];
   for (const env of environments) for (const [name, fault] of promotionFaults) {
-    cases++; const d = new UniversalHardeningGate(env).authorizePromotion(evidence(fault)); const shouldBlock = name !== "no-human-approval" || ENVIRONMENT_PROFILES[env].requireHumanApprovalForCriticalChange;
+    cases++; const d = new UniversalHardeningGate(env, "v1", () => true).authorizePromotion(evidence(fault)); const shouldBlock = name !== "no-human-approval" || ENVIRONMENT_PROFILES[env].requireHumanApprovalForCriticalChange;
     if (shouldBlock) expectedBlocks++; if (d.state === "QUARANTINED") actualBlocks++; if (shouldBlock && d.state !== "QUARANTINED") { silentTrustEscapes++; failures.push({ kind:"promotion-escape", env, name }); }
   }
 
   for (let i=0;i<100_000;i++) {
-    const env = pick(environments); const gate = new UniversalHardeningGate(env); const fault = pick(["threat","policy","replay","evidence","provenance","clock","promotion"] as const); cases++; let blocked = false;
+    const env = pick(environments); const gate = new UniversalHardeningGate(env, "v1", () => true); const fault = pick(["threat","policy","replay","evidence","provenance","clock","promotion"] as const); cases++; let blocked = false;
     if (fault === "threat") { const threat = pick(DEFAULT_THREAT_MATRIX.filter((t) => t !== "TRANSPORT_PARTITION_OR_REORDER")); blocked = gate.inspect(candidate(env), [signal(threat, pick(["HIGH","CRITICAL"] as const), 0.8+rnd()*0.2)]).state === "QUARANTINED"; }
     else if (fault === "policy") blocked = gate.inspect(candidate(env,{declaredPolicyVersion:"old"})).state === "QUARANTINED";
     else if (fault === "replay") blocked = gate.inspect(candidate(env,{replayDetected:true})).state === "QUARANTINED";
