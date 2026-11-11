@@ -23,8 +23,16 @@ jobs:
           PR_BRANCH: ${{ github.head_ref || github.ref_name }}
           GH_TOKEN: ${{ github.token }}
         run: |
+          if [ -z "$PR_BODY" ]; then
+            PR_BODY="$(curl -fsSL \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls?state=open&head=$GITHUB_REPOSITORY_OWNER:$PR_BRANCH" \
+              | python -c 'import json,sys; p=json.load(sys.stdin); print(p[0].get("body") or "" if p else "")')"
+            export PR_BODY
+          fi
           node - <<'NODE'
-          let body = process.env.PR_BODY || "";
+          const body = process.env.PR_BODY || "";
           const required = [
             "npm run build passes in CI",
             "npm test passes in CI",
@@ -34,22 +42,7 @@ jobs:
             "Evidence labels in `docs/WHITEPAPER.md` were not weakened"
           ];
 
-          if (!body.trim()) {
-            const { execFileSync } = require("node:child_process");
-            try {
-              body = execFileSync("gh", ["pr", "list", "--state", "open",
-                "--head", `${process.env.GITHUB_REPOSITORY_OWNER}:${process.env.PR_BRANCH}`, "--json", "body",
-                "--jq", ".[0].body"], { encoding: "utf8",
-                env: { ...process.env, GH_TOKEN: process.env.GH_TOKEN } });
-            } catch {
-              console.error("Could not retrieve the open PR body for this branch.");
-              process.exit(1);
-            }
-          }
-          if (!body.trim()) {
-            console.error("PR body is empty; required checklist items are missing.");
-            process.exit(1);
-          }
+
 
           const missing = required.filter((item) => {
             const escaped = item.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
