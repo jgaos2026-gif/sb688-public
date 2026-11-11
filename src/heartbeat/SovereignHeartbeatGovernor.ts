@@ -108,7 +108,24 @@ export class SovereignHeartbeatGovernor {
   ) {
     if (!sovereignId.trim()) throw new Error("sovereignId is required");
     if (!policyVersion.trim()) throw new Error("policyVersion is required");
-    if (policy.basePulseMs <= 0) throw new Error("basePulseMs must be positive");
+    const positiveValues = [
+      policy.basePulseMs,
+      policy.maxClockSkewMs,
+      policy.trustFreezeAfterMissedBeats,
+      policy.quarantineAfterMissedBeats,
+      policy.phoenixAfterMissedBeats,
+      policy.healthyBeatsBeforeRejoinReview,
+      policy.checkpointHealthEveryBeats,
+      policy.memoryHealthEveryBeats,
+      policy.trioWakeEveryMs
+    ];
+    if (positiveValues.some((value) => !Number.isSafeInteger(value) || value <= 0)) {
+      throw new Error("heartbeat policy intervals and thresholds must be positive safe integers");
+    }
+    if (policy.trustFreezeAfterMissedBeats > policy.quarantineAfterMissedBeats ||
+        policy.quarantineAfterMissedBeats > policy.phoenixAfterMissedBeats) {
+      throw new Error("heartbeat escalation thresholds must be ordered freeze <= quarantine <= Phoenix");
+    }
     this.policy = Object.freeze({ ...policy });
   }
 
@@ -116,37 +133,68 @@ export class SovereignHeartbeatGovernor {
     const reasons: string[] = [];
     const actions: HeartbeatAction[] = ["RECORD_HEARTBEAT"];
 
+    if (beat === null || typeof beat !== "object") {
+      return Object.freeze({
+        accepted: false,
+        healthy: false,
+        reasons: Object.freeze(["heartbeat is not an object"]),
+        actions: Object.freeze(["RECORD_HEARTBEAT", "FREEZE_TRUST_PROMOTION", "REQUEST_QUARANTINE", "ESCALATE_TO_TRIO"] as HeartbeatAction[]),
+        missedBeats: 0,
+        consecutiveHealthyBeats: 0,
+        activeTrioMember: 1,
+        trustPromotionFrozen: true,
+        quarantineRequested: true,
+        phoenixRecoveryRequested: false,
+        rejoinReviewAllowed: false
+      });
+    }
+
     if (beat.sovereignId !== this.sovereignId) reasons.push("wrong sovereign identity");
-    if (!beat.sectionId.trim()) reasons.push("missing section identity");
-    if (!beat.nodeId.trim()) reasons.push("missing node identity");
+    if (typeof beat.sectionId !== "string" || !beat.sectionId.trim()) reasons.push("missing section identity");
+    if (typeof beat.nodeId !== "string" || !beat.nodeId.trim()) reasons.push("missing node identity");
     if (!beat.sourceAuthenticated) reasons.push("heartbeat source not authenticated");
     if (!beat.provenancePresent) reasons.push("heartbeat provenance missing");
-    if (!beat.evidenceRef.trim()) reasons.push("heartbeat evidence reference missing");
+    if (typeof beat.evidenceRef !== "string" || !beat.evidenceRef.trim()) reasons.push("heartbeat evidence reference missing");
     if (beat.policyVersion !== this.policyVersion) reasons.push("heartbeat policy drift");
-    if (!Number.isInteger(beat.epoch) || beat.epoch < 0) reasons.push("invalid heartbeat epoch");
-    if (!Number.isInteger(beat.sequence) || beat.sequence < 0) reasons.push("invalid heartbeat sequence");
-    if (Math.abs(beat.receivedAtMs - beat.emittedAtMs) > this.policy.maxClockSkewMs) reasons.push("heartbeat clock skew exceeded");
+    if (!Number.isSafeInteger(beat.epoch) || beat.epoch < 0) reasons.push("invalid heartbeat epoch");
+    if (!Number.isSafeInteger(beat.sequence) || beat.sequence < 0) reasons.push("invalid heartbeat sequence");
+    if (!Number.isFinite(beat.emittedAtMs) || beat.emittedAtMs < 0 ||
+        !Number.isFinite(beat.receivedAtMs) || beat.receivedAtMs < 0) {
+      reasons.push("heartbeat timestamps must be finite non-negative numbers");
+    } else if (Math.abs(beat.receivedAtMs - beat.emittedAtMs) > this.policy.maxClockSkewMs) {
+      reasons.push("heartbeat clock skew exceeded");
+    }
+    if (!["PATROL", "TRIO_MEMBER_1", "TRIO_MEMBER_2", "TRIO_MEMBER_3",
+          "PHOENIX", "NODE_BRIGADE", "IRONLINK_3", "WATCHDOG_OVERSEER",
+          "STITCHBRICK_COORDINATOR"].includes(beat.role)) {
+      reasons.push("invalid heartbeat role");
+    }
 
-    const key = this.key(beat);
-    const previous = this.state.get(key);
+    const keyValid = typeof beat.sectionId === "string" && !!beat.sectionId.trim() &&
+      typeof beat.nodeId === "string" && !!beat.nodeId.trim();
+    const key = keyValid ? this.key(beat) : "";
+    const previous = keyValid ? this.state.get(key) : undefined;
     let missedBeats = 0;
 
     if (previous) {
       if (beat.epoch < previous.epoch) reasons.push("heartbeat epoch rollback detected");
       if (beat.epoch === previous.epoch && beat.sequence <= previous.sequence) reasons.push("heartbeat replay or duplicate detected");
 
-      if (beat.receivedAtMs <= previous.receivedAtMs) {
+      if (Number.isFinite(beat.receivedAtMs) && beat.receivedAtMs <= previous.receivedAtMs) {
         reasons.push("non-monotonic heartbeat arrival detected");
-      } else {
+      } else if (Number.isFinite(beat.receivedAtMs)) {
         const elapsed = beat.receivedAtMs - previous.receivedAtMs;
-        const expectedIntervals = Math.max(1, Math.round(elapsed / this.policy.basePulseMs));
+        const expectedIntervals = Math.max(1, Math.floor(elapsed / this.policy.basePulseMs));
         missedBeats = Math.max(0, expectedIntervals - 1);
       }
     }
 
     const accepted = reasons.length === 0;
     const healthy = accepted && missedBeats === 0;
-    const activeTrioMember = this.trioMemberAt(beat.receivedAtMs);
+    const safeReceivedAtMs = Number.isFinite(beat.receivedAtMs) && beat.receivedAtMs >= 0
+      ? beat.receivedAtMs
+      : previous?.receivedAtMs ?? 0;
+    const activeTrioMember = this.trioMemberAt(safeReceivedAtMs);
 
     let consecutiveHealthyBeats = healthy ? (previous?.consecutiveHealthyBeats ?? 0) + 1 : 0;
     let trustPromotionFrozen = previous?.trustPromotionFrozen ?? false;
@@ -192,21 +240,30 @@ export class SovereignHeartbeatGovernor {
 
     if (rejoinReviewAllowed) actions.push("REJOIN_REVIEW_ALLOWED");
 
-    if (accepted) {
-      // A healthy heartbeat may clear the timing-side freeze only after the full
-      // probation window. It never clears quarantine/recovery authority itself.
-      if (consecutiveHealthyBeats >= this.policy.healthyBeatsBeforeRejoinReview) {
-        trustPromotionFrozen = false;
+    if (keyValid) {
+      if (accepted) {
+        this.state.set(key, {
+          epoch: beat.epoch,
+          sequence: beat.sequence,
+          receivedAtMs: beat.receivedAtMs,
+          consecutiveHealthyBeats,
+          trustPromotionFrozen,
+          quarantineRequested,
+          phoenixRecoveryRequested
+        });
+      } else {
+        // Persist fail-closed state even when the heartbeat is rejected.
+        // Do not advance epoch, sequence, or time from untrusted input.
+        this.state.set(key, {
+          epoch: previous?.epoch ?? 0,
+          sequence: previous?.sequence ?? -1,
+          receivedAtMs: previous?.receivedAtMs ?? 0,
+          consecutiveHealthyBeats: 0,
+          trustPromotionFrozen: true,
+          quarantineRequested: true,
+          phoenixRecoveryRequested
+        });
       }
-      this.state.set(key, {
-        epoch: beat.epoch,
-        sequence: beat.sequence,
-        receivedAtMs: beat.receivedAtMs,
-        consecutiveHealthyBeats,
-        trustPromotionFrozen,
-        quarantineRequested,
-        phoenixRecoveryRequested
-      });
     }
 
     return Object.freeze({
@@ -235,11 +292,14 @@ export class SovereignHeartbeatGovernor {
       readonly evidencePreserved: boolean;
     }
   ): boolean {
+    if (typeof nodeId !== "string" || !nodeId.trim() ||
+        typeof sectionId !== "string" || !sectionId.trim() ||
+        evidence === null || typeof evidence !== "object") return false;
     const key = `${sectionId}::${nodeId}`;
     const current = this.state.get(key);
     if (!current) return false;
-    if (!evidence.verified || !evidence.validated || !evidence.certified) return false;
-    if (!evidence.checkpointPresent || !evidence.evidencePreserved) return false;
+    if (evidence.verified !== true || evidence.validated !== true || evidence.certified !== true) return false;
+    if (evidence.checkpointPresent !== true || evidence.evidencePreserved !== true) return false;
 
     current.quarantineRequested = false;
     current.phoenixRecoveryRequested = false;
