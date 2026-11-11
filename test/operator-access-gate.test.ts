@@ -14,3 +14,22 @@ test("policy drift blocks", () => assert.equal(gate.authorize({ ...base, declare
 test("oversize blocks", () => assert.equal(gate.authorize({ ...base, bodyBytes: 3 * 1024 * 1024 }).statusCode, 413));
 test("critical Stitch connect requires human approval checkpoint and evidence", () => { const d = gate.authorize({ ...base, path: "/api/omega/connect", humanApprovedCriticalChange: false }); assert.equal(d.allowed, false); assert.ok(d.reasons.length >= 3); });
 test("critical Stitch connect passes complete gate", () => { const d = gate.authorize({ ...base, path: "/api/omega/connect", humanApprovedCriticalChange: true, checkpointId: "cp-1", evidenceRef: "ledger:1" }); assert.equal(d.allowed, true); });
+
+
+test("malformed access contexts fail closed without throwing", () => {
+  assert.equal(gate.authorize(null as unknown as OperatorRequestContext).statusCode, 400);
+  assert.equal(gate.authorize({ ...base, bodyBytes: Number.NaN }).statusCode, 400);
+  assert.equal(gate.authorize({ ...base, bodyBytes: -1 }).statusCode, 400);
+  assert.equal(gate.authorize({ ...base, sourceId: 42 as unknown as string }).allowed, false);
+  assert.equal(gate.authorize({ ...base, contentType: 42 as unknown as string }).statusCode, 415);
+});
+
+test("invalid access policy configuration is rejected at construction", () => {
+  assert.throws(() => new OperatorAccessGate({
+    maxBodyBytes: -1,
+    requireJsonForMutations: true,
+    requireSourceIdentity: true,
+    requireProvenance: true,
+    allowedPaths: {}
+  }));
+});
