@@ -6,7 +6,7 @@ import { LiquidTruthNodeMesh } from "../truth/LiquidTruthNodeMesh";
 import { loadSpineKeysFromEnv } from "../truth/SpinePermitCrypto";
 import type { UserIntent } from "../contracts/runtime";
 import { AgentBrick } from "../agent/AgentBrick";
-import { readServerRuntimeConfig } from "./config";
+import { isValidOperatorAuthorization, readServerRuntimeConfig } from "./config";
 import { logServerEvent } from "./logger";
 
 export interface SystemServerOptions {
@@ -31,7 +31,7 @@ export function startSystemServer(options: SystemServerOptions = {}): void {
 
   const server = createServer(async (request, response) => {
     try {
-      await routeRequest(system, agent, spineGate, request, response, config.uploadMaxBodyBytes, startedAtMs, config.environment);
+      await routeRequest(system, agent, spineGate, request, response, config.uploadMaxBodyBytes, startedAtMs, config.environment, config.requireOperatorAuth, config.operatorToken);
     } catch (error) {
       logServerEvent("error", "request.unhandled", {
         message: error instanceof Error ? error.message : "unknown",
@@ -63,10 +63,22 @@ async function routeRequest(
   response: ServerResponse,
   uploadMaxBodyBytes: number,
   startedAtMs: number,
-  environment: "development" | "staging" | "production"
+  environment: "development" | "staging" | "production",
+  requireOperatorAuth: boolean,
+  operatorToken: string
 ): Promise<void> {
   const method = request.method ?? "GET";
   const url = request.url ?? "/";
+
+  // Public health/readiness probes are intentionally minimal. Every other
+  // API route is local/private data or a state-changing operation.
+  const publicProbe = method === "GET" && (url === "/api/health" || url === "/api/ready");
+  const serviceAuthenticatedRoute = method === "POST" && url === "/api/truth/pre-brain";
+  if (requireOperatorAuth && url.startsWith("/api/") && !publicProbe && !serviceAuthenticatedRoute &&
+      !isValidOperatorAuthorization(request.headers.authorization, operatorToken)) {
+    sendJson(response, 401, { ok: false, error: "Operator authentication required." });
+    return;
+  }
 
   if (method === "GET" && url === "/") {
     sendHtml(response, INDEX_HTML);
@@ -143,7 +155,13 @@ async function routeRequest(
   }
 
   if (method === "POST" && url === "/api/omega/connect") {
-    sendJson(response, 200, { ok: true, handshake: system.connectToStitch() });
+    const handshake = system.connectToStitch();
+    sendJson(response, 503, {
+      ok: false,
+      state: handshake.connection,
+      certification: handshake.certification,
+      handshake
+    });
     return;
   }
 

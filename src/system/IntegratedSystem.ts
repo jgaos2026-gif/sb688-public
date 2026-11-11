@@ -3,6 +3,7 @@ import type { RuntimeResponse, UserIntent } from "../contracts/runtime";
 import { AuditLedger } from "../ledger/AuditLedger";
 import { OmegaSupervisor } from "../omega/OmegaSupervisor";
 import type { OmegaStatus } from "../omega/contracts";
+import type { StitchConnectionReport } from "../omega/SovereignStitch";
 import { BraidedRuntime } from "../runtime/BraidedRuntime";
 import { FileUploadManager } from "../upload/FileUploadManager";
 
@@ -66,7 +67,7 @@ export class IntegratedSystem {
     });
   }
 
-  connectToStitch(): { readonly message: string; readonly signature: string; readonly at: string } {
+  connectToStitch(): StitchConnectionReport {
     return this.omega.connectToStitch();
   }
 

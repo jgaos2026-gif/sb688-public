@@ -5,7 +5,7 @@ import { SeedBrick } from "./SeedBrick";
 import { GhostBrick } from "./GhostBrick";
 import { ArmorBrick } from "./ArmorBrick";
 import { CrownBrick } from "./CrownBrick";
-import { SovereignStitch } from "./SovereignStitch";
+import { SovereignStitch, type StitchConnectionReport } from "./SovereignStitch";
 import type {
   DriftReport,
   OmegaStatus,
@@ -119,9 +119,13 @@ export class OmegaSupervisor {
   }
 
   /** Public handle for the protocol's connect handshake. */
-  connectToStitch(): { readonly message: string; readonly signature: string; readonly at: string } {
+  connectToStitch(): StitchConnectionReport {
     const handshake = this.stitch.connect();
-    this.audit("omega.connect", { signature: handshake.signature });
+    this.audit("omega.connect.requested", {
+      manifestBindingHash: handshake.manifestBindingHash,
+      connection: handshake.connection,
+      certification: handshake.certification
+    });
     return handshake;
   }
 

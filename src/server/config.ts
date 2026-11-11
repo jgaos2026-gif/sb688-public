@@ -4,6 +4,8 @@ export interface ServerRuntimeConfig {
   readonly port: number;
   readonly uploadMaxBodyBytes: number;
   readonly gracefulShutdownTimeoutMs: number;
+  readonly requireOperatorAuth: boolean;
+  readonly operatorToken: string;
 }
 
 const DEFAULTS: ServerRuntimeConfig = Object.freeze({
@@ -51,4 +53,16 @@ function normalizeInteger(value: string | number | undefined, fallback: number, 
     return fallback;
   }
   return Math.max(min, Math.min(max, Math.trunc(numeric)));
+}
+
+
+function isLoopbackHost(host: string): boolean {
+  return host === "127.0.0.1" || host === "::1" || host.toLowerCase() === "localhost";
+}
+
+export function isValidOperatorAuthorization(header: string | undefined, expectedToken: string): boolean {
+  if (typeof header !== "string" || !header.startsWith("Bearer ") || expectedToken.length < 32) return false;
+  const supplied = Buffer.from(header.slice(7), "utf8");
+  const expected = Buffer.from(expectedToken, "utf8");
+  return supplied.length === expected.length && require("node:crypto").timingSafeEqual(supplied, expected);
 }
