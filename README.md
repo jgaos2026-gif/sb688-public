@@ -219,3 +219,6 @@ before submitting a pull request.
 This project is licensed under the [MIT License](LICENSE).
 
 &copy; 2026 John Arenz (J.G.A.) — All rights reserved.
+## System status and triple braid assurance
+
+**System status** is reported from executable health and ledger checks; documentation labels do not substitute for runtime evidence. The **triple braid** is a verification design claim that must be supported by independent, measured verifier paths in each deployment. This repository's tests and evidence bundles distinguish implemented behavior from simulated, partial, and documented-only components.
