@@ -72,7 +72,8 @@ async function main(): Promise<void> {
 
   const handshake = omega.connectToStitch();
   console.log("\nON_READY ::", handshake.message);
-  console.log("Stitch signature:", handshake.signature);
+  console.log("Stitch binding hash:", handshake.manifestBindingHash);
+  console.log("Stitch connection:", handshake.connection, "| certification:", handshake.certification);
 
   console.log("\n=== Ledger Trace ===");
   for (const entry of ledger.entries()) {

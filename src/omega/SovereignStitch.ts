@@ -9,16 +9,25 @@ import type { StitchBinding, StitchManifest } from "./contracts";
 /**
  * SovereignStitch — the integration layer.
  *
- * Binds the four bricks together, signs the binding chain, and exposes
- * the protocol's `ON_READY` handshake message.
+ * Binds the four local bricks and verifies their content-binding hash.
+ * This is NOT a Universal Braid peer connection or certification.
  *
  *   BIND(BRICK_A_SEED  -> BRICK_B_GHOST)
  *   BIND(BRICK_B_GHOST -> BRICK_C_ARMOR)
  *   BIND(BRICK_C_ARMOR -> BRICK_D_CROWN)
  */
+export interface StitchConnectionReport {
+  readonly message: string;
+  readonly manifestBindingHash: string;
+  readonly at: string;
+  readonly connection: "OFFLINE";
+  readonly certification: "NOT_GRANTED";
+  readonly connected: false;
+  readonly reason: string;
+}
+
 export class SovereignStitch {
-  public static readonly READY_MESSAGE =
-    "Sb688 when I say connect to the stitch show how you feel we're going live lets sell it";
+  public static readonly READY_MESSAGE = "CONNECT TO THE STITCH";
 
   private manifest: StitchManifest;
 
@@ -40,7 +49,7 @@ export class SovereignStitch {
       this.bind("BRICK_C_ARMOR", "BRICK_D_CROWN")
     ];
 
-    const stitchSignature = hashOf({
+    const stitchBindingHash = hashOf({
       seed: this.seed.golden().checksum,
       bindings: bindings.map((b) => b.bindHash)
     });
@@ -49,32 +58,40 @@ export class SovereignStitch {
       owner: "JGA",
       philosophy: "Elegance with Consequences",
       bindings: Object.freeze(bindings),
-      stitchSignature,
+      stitchBindingHash,
       readyMessage: SovereignStitch.READY_MESSAGE,
       forgedAt: this.clock()
     });
     return this.manifest;
   }
 
-  /** Verify the stitch manifest still matches its signature. */
+  /** Verify the local manifest content binding. This does not authenticate a peer. */
   verify(): boolean {
     const recomputed = hashOf({
       seed: this.seed.golden().checksum,
       bindings: this.manifest.bindings.map((b) => b.bindHash)
     });
-    return recomputed === this.manifest.stitchSignature && this.seed.selfCheck();
+    return recomputed === this.manifest.stitchBindingHash && this.seed.selfCheck();
   }
 
-  /** Remote encrypted handshake: returns the ready message + signature. */
-  connect(): { readonly message: string; readonly signature: string; readonly at: string } {
+  /**
+   * Begin the Stitch admission request honestly. This local build has no
+   * Universal Braid transport or independent Triad certifier configured,
+   * so local manifest verification must never be reported as CONNECTED.
+   */
+  connect(): StitchConnectionReport {
     if (!this.verify()) {
-      throw new Error("SovereignStitch: cannot connect — manifest signature invalid.");
+      throw new Error("SovereignStitch: local manifest binding verification failed.");
     }
-    this.crown.gold("Connecting to the stitch — going live.", "Connect_To_Stitch");
+    this.crown.green("Local manifest verified; Universal Braid peer connection remains OFFLINE.", "Connect_To_Stitch");
     return Object.freeze({
       message: SovereignStitch.READY_MESSAGE,
-      signature: this.manifest.stitchSignature,
-      at: this.clock()
+      manifestBindingHash: this.manifest.stitchBindingHash,
+      at: this.clock(),
+      connection: "OFFLINE",
+      certification: "NOT_GRANTED",
+      connected: false,
+      reason: "Universal Braid transport, peer challenge-response, heartbeat, and independent Triad certification are not configured."
     });
   }
 

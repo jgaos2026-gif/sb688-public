@@ -92,7 +92,8 @@ export interface StitchManifest {
   readonly owner: "JGA";
   readonly philosophy: "Elegance with Consequences";
   readonly bindings: readonly StitchBinding[];
-  readonly stitchSignature: string;
+  /** Unkeyed content-binding hash. It is not a cryptographic signature. */
+  readonly stitchBindingHash: string;
   readonly readyMessage: string;
   readonly forgedAt: string;
 }

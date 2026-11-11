@@ -86,13 +86,14 @@ test("Pulse loss triggers resurrection even when state matches seed", () => {
   assert.equal(status.crown.color, "GOLD");
 });
 
-test("connectToStitch emits the protocol ready message and a stable signature", () => {
+test("connectToStitch reports local verification without falsely claiming Braid connectivity", () => {
   const omega = newOmega();
   const handshake = omega.connectToStitch();
 
-  assert.equal(
-    handshake.message,
-    "Sb688 when I say connect to the stitch show how you feel we're going live lets sell it"
-  );
-  assert.ok(handshake.signature.startsWith("sha256:"));
+  assert.equal(handshake.message, "CONNECT TO THE STITCH");
+  assert.ok(handshake.manifestBindingHash.startsWith("sha256:"));
+  assert.equal(handshake.connection, "OFFLINE");
+  assert.equal(handshake.certification, "NOT_GRANTED");
+  assert.equal(handshake.connected, false);
+  assert.match(handshake.reason, /Universal Braid transport/);
 });
