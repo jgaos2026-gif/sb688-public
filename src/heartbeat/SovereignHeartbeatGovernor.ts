@@ -240,6 +240,14 @@ export class SovereignHeartbeatGovernor {
 
     if (rejoinReviewAllowed) actions.push("REJOIN_REVIEW_ALLOWED");
 
+    // The timing freeze can clear only after probation AND after a separate
+    // governed recovery acknowledgement has cleared quarantine/Phoenix state.
+    if (accepted &&
+        consecutiveHealthyBeats >= this.policy.healthyBeatsBeforeRejoinReview &&
+        !quarantineRequested && !phoenixRecoveryRequested) {
+      trustPromotionFrozen = false;
+    }
+
     if (keyValid) {
       if (accepted) {
         this.state.set(key, {
