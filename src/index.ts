@@ -55,7 +55,9 @@ export type {
   ArtifactCandidate,
   Severity,
   PurificationDecision,
+  CertifierProof,
   PromotionEvidence,
+  PromotionEvidenceVerifier,
   PromotionDecision,
   ThreatClass as UniversalThreatClass,
   ThreatSignal as UniversalThreatSignal
