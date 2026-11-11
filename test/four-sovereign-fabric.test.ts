@@ -20,7 +20,7 @@ test("invalid sovereign identities and actions are rejected without throwing", (
 test("forged report envelopes and policy drift cannot pass transport", () => {
   const report = fabric.createReport("SOVEREIGN_4", "SOVEREIGN_1", "VERIFY", ["proof:a"], "constitution-v1", "r3");
   assert.equal(fabric.authorizeTransport({ ...report, policyVersion: "v0" }, "SOVEREIGN_2").accepted, false);
-  assert.equal(fabric.authorizeTransport({ ...report, trusted: true }, "SOVEREIGN_2").accepted, false);
+  assert.equal(fabric.authorizeTransport(({ ...report, trusted: true } as unknown as typeof report), "SOVEREIGN_2").accepted, false);
   assert.equal(fabric.authorizeTransport(null as unknown as typeof report, "SOVEREIGN_2").accepted, false);
 });
 
