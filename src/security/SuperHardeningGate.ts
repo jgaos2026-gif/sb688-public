@@ -2,7 +2,6 @@ import {
   UniversalHardeningGate,
   type ArtifactCandidate,
   type EnvironmentId,
-  type EnvironmentProfile,
   type PurificationDecision,
   type ThreatSignal
 } from "./UniversalHardening";
@@ -16,8 +15,8 @@ import {
  * partition/reorder in partition-tolerant profiles).
  */
 export class SuperHardeningGate extends UniversalHardeningGate {
-  constructor(environment: EnvironmentId | EnvironmentProfile = "GENERAL") {
-    super(environment);
+  constructor(environment: EnvironmentId = "GENERAL", currentPolicyVersion = "v1") {
+    super(environment, currentPolicyVersion);
   }
 
   override inspect(candidate: ArtifactCandidate, signals: readonly ThreatSignal[] = []): PurificationDecision {
