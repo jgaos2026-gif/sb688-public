@@ -142,3 +142,6 @@ Before calling any deployment production-hardened, complete at minimum:
 ## Claim discipline
 
 The design goal is a universal integrity substrate. The engineering claim is narrower: **the architecture attempts to preserve trust boundaries, evidence, recovery discipline, and sovereign role separation across multiple deployment environments.** Each real industry deployment must still prove its own security, safety, reliability, performance, and compliance requirements.
+
+
+**Heartbeat persistence limitation:** `SovereignHeartbeatGovernor` currently keeps per-node sequence, probation, freeze, and quarantine state in process memory. A process restart resets that state. Production autonomous recovery must first add durable, integrity-checked state replay (for example, from the file-backed AuditLedger) and verify it across restarts; the heartbeat class alone is not a production watchdog.
