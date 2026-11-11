@@ -67,3 +67,21 @@ and must pass SB688 verification before joining the stitch.
 
 ---
 The system combines cutting-edge tools to demonstrate "**Verification Before Trust.**"
+
+## Sovereign hardening fabric (integrated candidate)
+
+This branch integrates the previously separate Sovereign hardening work with the current SB688 mainline. The additions are executable policy and test modules, not a claim that a production deployment is already autonomous.
+
+- **Trust state machine:** legal state transitions are explicit; recovery cannot jump directly to certification.
+- **Recovery capsules:** Stitch control state and memory remain separate. Memory cannot overwrite Stitch-owned keys. A recovered state remains untrusted until a healthy, verified, validated scan.
+- **Evidence bundles and ledger anchors:** verification runs can produce machine-readable and human-readable evidence; ledger anchors bind record count, head hash, and a SHA-256 digest.
+- **Proactive integrity fabric:** threat detection freezes trust promotion; incident learning requires evidence-backed verification, validation, certification, and governed promotion.
+- **Four-sovereign fabric:** Stitch integrity/recovery coordination, transport, watchdog correlation/escalation, and node-brigade verification have distinct role boundaries.
+- **Universal hardening and operator access gates:** environment profiles, source/provenance requirements, action sensitivity, and fail-closed policy decisions.
+- **Hardened backend kernel:** a transport-agnostic boundary that keeps adapters outside the trust core.
+- **Heartbeat governor:** deterministic heartbeat, missed-beat, quarantine, and recovery policy logic.
+- **Campaigns:** `npm run evidence`, `npm run hardening:campaign`, and `npm run hardening:super`.
+
+### Operational boundary
+
+These modules do not create a self-starting production daemon by themselves. A deployment still needs a supervisor/scheduler to invoke heartbeat and patrol cycles, persistent storage for state and evidence, real independent verifier services, key custody, monitoring/alert delivery, and a configured action policy. The campaign results are test-harness evidence, not external penetration testing or production certification.
