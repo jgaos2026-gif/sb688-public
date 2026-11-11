@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - stitch/universal-hardening-2026-08-15
+      - sovereign/integrated-hardening-2026-11-11
   workflow_dispatch:
 
 permissions:
@@ -30,6 +31,8 @@ jobs:
         run: npm run verify
       - name: Run universal hardening fault campaign
         run: npm run hardening:campaign
+      - name: Run super-hard industry campaign
+        run: npm run hardening:super
       - name: Upload hardening evidence
         if: always()
         uses: actions/upload-artifact@v4
