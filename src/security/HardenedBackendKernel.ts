@@ -4,6 +4,7 @@ import {
   type ArtifactCandidate,
   type EnvironmentId,
   type PromotionEvidence,
+  type PromotionEvidenceVerifier,
   type ThreatSignal
 } from "./UniversalHardening";
 import { FourSovereignFabric } from "../system/FourSovereignFabric";
@@ -64,13 +65,14 @@ export class HardenedBackendKernel {
   constructor(
     private readonly adapter: BackendAdapter,
     environment: EnvironmentId = "GENERAL",
-    private readonly currentPolicyVersion = "v1"
+    private readonly currentPolicyVersion = "v1",
+    promotionEvidenceVerifier?: PromotionEvidenceVerifier
   ) {
     if (!adapter || typeof adapter !== "object" || !currentPolicyVersion.trim()) {
       throw new Error("trusted backend adapter and current policy version are required");
     }
-    this.hardening = new UniversalHardeningGate(environment, currentPolicyVersion);
-    this.sovereigns = new FourSovereignFabric(environment, currentPolicyVersion);
+    this.hardening = new UniversalHardeningGate(environment, currentPolicyVersion, promotionEvidenceVerifier);
+    this.sovereigns = new FourSovereignFabric(environment, currentPolicyVersion, promotionEvidenceVerifier);
   }
 
   async handle(request: BackendRequest): Promise<BackendResponse> {
