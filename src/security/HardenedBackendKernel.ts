@@ -69,7 +69,7 @@ export class HardenedBackendKernel {
     if (!adapter || typeof adapter !== "object" || !currentPolicyVersion.trim()) {
       throw new Error("trusted backend adapter and current policy version are required");
     }
-    this.hardening = new UniversalHardeningGate(environment);
+    this.hardening = new UniversalHardeningGate(environment, currentPolicyVersion);
     this.sovereigns = new FourSovereignFabric(environment);
   }
 
