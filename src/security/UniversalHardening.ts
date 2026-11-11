@@ -128,16 +128,27 @@ export interface PurificationDecision {
   readonly requiresAssurance: true;
 }
 
+export interface CertifierProof {
+  readonly certifierId: string;
+  readonly keyId: string;
+  readonly signature: string;
+  readonly payloadHash: string;
+}
+
 export interface PromotionEvidence {
   readonly verified: boolean;
   readonly validated: boolean;
   readonly certifierIds: readonly string[];
+  readonly certifierProofs: readonly CertifierProof[];
   readonly checkpointPresent: boolean;
   readonly evidencePreserved: boolean;
   readonly policyVersion: string;
   readonly humanApprovedCriticalChange?: boolean;
   readonly unresolvedSignals?: readonly ThreatSignal[];
 }
+
+/** Trusted verifier backed by a pinned certifier public-key registry. */
+export type PromotionEvidenceVerifier = (evidence: PromotionEvidence) => boolean;
 
 export interface PromotionDecision {
   readonly state: "CERTIFIED" | "QUARANTINED";
@@ -152,7 +163,8 @@ export class UniversalHardeningGate {
 
   constructor(
     environment: EnvironmentId = "GENERAL",
-    readonly currentPolicyVersion = "v1"
+    readonly currentPolicyVersion = "v1",
+    private readonly verifyPromotionEvidence?: PromotionEvidenceVerifier
   ) {
     const selected = ENVIRONMENT_PROFILES[environment];
     if (!selected) throw new Error("unknown hardening environment profile");
@@ -264,6 +276,40 @@ export class UniversalHardeningGate {
         const uniqueCertifiers = new Set(validIds);
         if (uniqueCertifiers.size < p.minIndependentCertifiers) reasons.push("insufficient independent certifiers");
         if (uniqueCertifiers.size !== evidence.certifierIds.length) reasons.push("duplicate/self certification path detected");
+
+        if (!Array.isArray(evidence.certifierProofs) ||
+            evidence.certifierProofs.length !== evidence.certifierIds.length) {
+          reasons.push("one signed proof per certifier is required");
+        } else {
+          const proofIds = evidence.certifierProofs.map((proof) =>
+            proof && typeof proof.certifierId === "string" ? proof.certifierId : ""
+          );
+          if (proofIds.some((id) => !id.trim()) ||
+              new Set(proofIds).size !== proofIds.length ||
+              proofIds.some((id) => !uniqueCertifiers.has(id)) ||
+              proofIds.length !== uniqueCertifiers.size) {
+            reasons.push("certifier proof identities do not match the independent certifier set");
+          }
+          if (evidence.certifierProofs.some((proof) =>
+            !proof || typeof proof.keyId !== "string" || !proof.keyId.trim() ||
+            typeof proof.signature !== "string" || !proof.signature.trim() ||
+            typeof proof.payloadHash !== "string" || !/^[a-f0-9]{64}$/i.test(proof.payloadHash)
+          )) {
+            reasons.push("malformed certifier signature proof");
+          }
+        }
+      }
+
+      if (!this.verifyPromotionEvidence) {
+        reasons.push("trusted cryptographic certifier verifier is not configured");
+      } else {
+        try {
+          if (this.verifyPromotionEvidence(evidence) !== true) {
+            reasons.push("independent certifier signature verification failed");
+          }
+        } catch {
+          reasons.push("independent certifier signature verification errored");
+        }
       }
 
       if (evidence.checkpointPresent !== true) reasons.push("checkpoint required before promotion");
