@@ -48,7 +48,7 @@ export interface FabricDecision {
 
 export class FourSovereignFabric {
   private readonly gate: UniversalHardeningGate;
-  constructor(environment: EnvironmentId = "GENERAL") { this.gate = new UniversalHardeningGate(environment); }
+  constructor(environment: EnvironmentId = "GENERAL", currentPolicyVersion = "v1") { this.gate = new UniversalHardeningGate(environment, currentPolicyVersion); }
   definitions(): readonly SovereignDefinition[] { return Object.freeze(Object.values(FOUR_SOVEREIGNS)); }
   authorizeAction(source: SovereignId, action: SovereignAction): FabricDecision {
     const definition = FOUR_SOVEREIGNS[source];
