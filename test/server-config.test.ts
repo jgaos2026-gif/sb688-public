@@ -54,3 +54,16 @@ test("public probes and the separately authenticated SB688 service route are sco
   assert.equal(requiresOperatorAuthorization("GET", "/api/ledger", true), true);
   assert.equal(requiresOperatorAuthorization("POST", "/api/agent/configure", false), false);
 });
+
+test("SB689 deployment environment names are accepted with legacy SB688 aliases", () => {
+  const config = readServerRuntimeConfig({
+    SB689_ENV: "production",
+    SB689_HOST: "0.0.0.0",
+    SB689_OPERATOR_TOKEN: token,
+    SB689_PORT: "6891"
+  });
+  assert.equal(config.environment, "production");
+  assert.equal(config.host, "0.0.0.0");
+  assert.equal(config.port, 6891);
+  assert.equal(config.requireOperatorAuth, true);
+});
