@@ -164,7 +164,11 @@ async function routeRequest(
       sendJson(response, 401, { ok: false, error: "Unauthorized service caller." });
       return;
     }
-    const body = await readJsonBody(request);
+    const body = await readJsonBodyWithLimit(request, 16 * 1024);
+    if (body === null) {
+      sendJson(response, 413, { ok: false, error: "Pre-brain intent request is too large." });
+      return;
+    }
     const id = typeof body.id === "string" ? body.id.trim() : "";
     const text = typeof body.text === "string" ? body.text.trim() : "";
     if (!id || !text || text.length > 12_000) {
