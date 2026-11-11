@@ -20,3 +20,45 @@ test("purified intent may execute but remains outside Spine trust promotion", as
 test("Stitch connect cannot execute without human approval checkpoint evidence and certification", async () => { const a = fakeAdapter(); const k = new HardenedBackendKernel(a, "NATIONAL_SECURITY"); const r = await k.handle({ ...base, operation: "CONNECT_STITCH", humanApprovedCriticalChange: false, promotionEvidence: evidence }); assert.equal(r.ok, false); assert.deepEqual(a.calls, []); });
 test("Stitch connect executes only after complete access and certification gates", async () => { const a = fakeAdapter(); const k = new HardenedBackendKernel(a, "NATIONAL_SECURITY"); const r = await k.handle({ ...base, operation: "CONNECT_STITCH", humanApprovedCriticalChange: true, checkpointId: "cp-1", evidenceRef: "ledger:1", promotionEvidence: evidence }); assert.equal(r.ok, true); assert.deepEqual(a.calls, ["connect"]); });
 test("unknown critical threat blocks in every environment tested", async () => { const envs: EnvironmentId[] = ["GENERAL","AI_AGENT","CRITICAL_INFRASTRUCTURE","NATIONAL_SECURITY","MEDICAL_NEURAL_INTERFACE","DEEP_SPACE","DEEP_SEA","FINANCIAL","HEALTHCARE","INDUSTRIAL"]; for (const env of envs) { const a = fakeAdapter(); const k = new HardenedBackendKernel(a, env); const r = await k.handle({ ...base, operation: "TICK", signals: [{ type: "UNKNOWN", severity: "CRITICAL", confidence: 1, detail: "unknown", source: "test" }] }); assert.equal(r.ok, false, env); assert.deepEqual(a.calls, [], env); } });
+
+
+test("client cannot self-declare the current policy version", async () => {
+  const a = fakeAdapter();
+  const k = new HardenedBackendKernel(a, "AI_AGENT", "v2");
+  const r = await k.handle({
+    ...base,
+    operation: "RUN_INTENT",
+    policyVersion: "v1",
+    artifact: { ...artifact, declaredPolicyVersion: "v1", currentPolicyVersion: "v1" }
+  });
+  assert.equal(r.ok, false);
+  assert.deepEqual(a.calls, []);
+});
+
+test("trusted kernel policy overrides client-supplied current policy field", async () => {
+  const a = fakeAdapter();
+  const k = new HardenedBackendKernel(a, "AI_AGENT", "v2");
+  const r = await k.handle({
+    ...base,
+    operation: "RUN_INTENT",
+    policyVersion: "v2",
+    artifact: { ...artifact, declaredPolicyVersion: "v2", currentPolicyVersion: "v1" }
+  });
+  assert.equal(r.ok, true);
+  assert.deepEqual(a.calls, ["run"]);
+});
+
+test("malformed and inherited operation names are rejected without throwing", async () => {
+  const a = fakeAdapter();
+  const k = new HardenedBackendKernel(a, "AI_AGENT");
+  const malformed = await k.handle(null as unknown as Parameters<typeof k.handle>[0]);
+  const inherited = await k.handle({
+    ...base,
+    operation: "toString" as unknown as "RUN_INTENT"
+  });
+  assert.equal(malformed.ok, false);
+  assert.equal(malformed.statusCode, 400);
+  assert.equal(inherited.ok, false);
+  assert.equal(inherited.statusCode, 404);
+  assert.deepEqual(a.calls, []);
+});
