@@ -69,7 +69,7 @@ test("first healthy verified validated scan can mint a fresh capsule", () => {
   assert.equal(recovered.success, true);
 
   const freshCapsule = StitchRecoveryCapsule.renewAfterHealthyScan(
-    recovered.state,
+    recovered,
     { healthy: true, verified: true, validated: true, corruptionDetected: false },
     { epoch: 42, freshHealth: "clean" }
   );
@@ -95,7 +95,7 @@ test("failed first scan cannot mint a fresh capsule", () => {
   ];
 
   for (const scan of scanVariants) {
-    assert.equal(StitchRecoveryCapsule.renewAfterHealthyScan(recovered.state, scan), null);
+    assert.equal(StitchRecoveryCapsule.renewAfterHealthyScan(recovered, scan), null);
   }
 });
 
