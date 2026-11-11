@@ -48,9 +48,20 @@ export interface FabricDecision {
 
 export class FourSovereignFabric {
   private readonly gate: UniversalHardeningGate;
-  constructor(environment: EnvironmentId = "GENERAL", currentPolicyVersion = "v1") { this.gate = new UniversalHardeningGate(environment, currentPolicyVersion); }
+  constructor(
+    environment: EnvironmentId = "GENERAL",
+    readonly currentPolicyVersion = "v1"
+  ) {
+    this.gate = new UniversalHardeningGate(environment, currentPolicyVersion);
+  }
   definitions(): readonly SovereignDefinition[] { return Object.freeze(Object.values(FOUR_SOVEREIGNS)); }
   authorizeAction(source: SovereignId, action: SovereignAction): FabricDecision {
+    if (!Object.prototype.hasOwnProperty.call(FOUR_SOVEREIGNS, source) ||
+        !["PURIFY", "VERIFY", "VALIDATE", "CERTIFY", "REFERENCE_COMPARE",
+          "REVERIFY", "REPAIR_CANDIDATE", "TRANSPORT", "CORRELATE", "ALERT",
+          "ESCALATE", "QUARANTINE", "COORDINATE_RECOVERY"].includes(action)) {
+      return Object.freeze({ accepted: false, reason: "unknown sovereign identity or action", source, action });
+    }
     const definition = FOUR_SOVEREIGNS[source];
     const allowed = definition.allowedActions.includes(action) && !definition.forbiddenActions.includes(action);
     return Object.freeze({ accepted: allowed, reason: allowed ? `${definition.role} may perform ${action} within its declared sovereign boundary` : `${definition.role} is not authorized to perform ${action}`, source, action });
@@ -60,15 +71,35 @@ export class FourSovereignFabric {
   createReport(source: SovereignId, destination: SovereignId, action: SovereignAction, evidenceRefs: readonly string[], policyVersion: string, reportId = `${source}:${destination}:${action}:${Date.now()}`): SovereignReport {
     const authorization = this.authorizeAction(source, action);
     if (!authorization.accepted) throw new Error(authorization.reason);
+    if (!Object.prototype.hasOwnProperty.call(FOUR_SOVEREIGNS, destination)) throw new Error("unknown report destination");
     if (source === "SOVEREIGN_4" && destination !== "SOVEREIGN_1") throw new Error("SOVEREIGN_4 reports upward to SOVEREIGN_1 only; sideways bypass is forbidden");
     if (source === destination) throw new Error("cross-sovereign report destination must differ from source");
-    if (!policyVersion.trim()) throw new Error("policyVersion is required");
-    if (evidenceRefs.length === 0 || evidenceRefs.some((entry) => !entry.trim())) throw new Error("at least one non-empty evidence reference is required");
+    if (typeof policyVersion !== "string" || policyVersion !== this.currentPolicyVersion) throw new Error("policy version missing or drifted");
+    if (typeof reportId !== "string" || !reportId.trim()) throw new Error("reportId is required");
+    if (!Array.isArray(evidenceRefs) || evidenceRefs.length === 0 ||
+        evidenceRefs.some((entry) => typeof entry !== "string" || !entry.trim())) {
+      throw new Error("at least one non-empty evidence reference is required");
+    }
     return Object.freeze({ reportId, source, destination, action, evidenceRefs: Object.freeze([...evidenceRefs]), policyVersion, trusted: false, requiresTransportGate: true, mayTouchSpine: false });
   }
   authorizeTransport(report: SovereignReport, transportSovereign: SovereignId = "SOVEREIGN_2"): FabricDecision {
     if (transportSovereign !== "SOVEREIGN_2") return Object.freeze({ accepted: false, reason: "Only SOVEREIGN_2 / IronLink 3 may transport cross-sovereign reports", source: transportSovereign, action: "TRANSPORT" });
-    if (!report.requiresTransportGate || report.evidenceRefs.length === 0 || !report.policyVersion.trim()) return Object.freeze({ accepted: false, reason: "Report lacks governed transport evidence", source: transportSovereign, action: "TRANSPORT" });
+    if (report === null || typeof report !== "object" ||
+        typeof report.reportId !== "string" || !report.reportId.trim() ||
+        !Object.prototype.hasOwnProperty.call(FOUR_SOVEREIGNS, report.source) ||
+        !Object.prototype.hasOwnProperty.call(FOUR_SOVEREIGNS, report.destination) ||
+        report.source === report.destination ||
+        report.trusted !== false || report.mayTouchSpine !== false ||
+        report.requiresTransportGate !== true ||
+        report.policyVersion !== this.currentPolicyVersion ||
+        !Array.isArray(report.evidenceRefs) || report.evidenceRefs.length === 0 ||
+        report.evidenceRefs.some((entry) => typeof entry !== "string" || !entry.trim())) {
+      return Object.freeze({ accepted: false, reason: "Report lacks valid governed transport evidence", source: transportSovereign, action: "TRANSPORT" });
+    }
+    const sourceAuthorization = this.authorizeAction(report.source, report.action);
+    if (!sourceAuthorization.accepted) {
+      return Object.freeze({ accepted: false, reason: "Report action is not authorized for its source sovereign", source: transportSovereign, action: "TRANSPORT" });
+    }
     return this.authorizeAction(transportSovereign, "TRANSPORT");
   }
 }
