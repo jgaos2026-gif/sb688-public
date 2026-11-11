@@ -4,6 +4,7 @@ import {
   type EnvironmentId,
   type PromotionDecision,
   type PromotionEvidence,
+  type PromotionEvidenceVerifier,
   type PurificationDecision,
   type ThreatSignal
 } from "../security/UniversalHardening";
@@ -50,9 +51,10 @@ export class FourSovereignFabric {
   private readonly gate: UniversalHardeningGate;
   constructor(
     environment: EnvironmentId = "GENERAL",
-    readonly currentPolicyVersion = "v1"
+    readonly currentPolicyVersion = "v1",
+    promotionEvidenceVerifier?: PromotionEvidenceVerifier
   ) {
-    this.gate = new UniversalHardeningGate(environment, currentPolicyVersion);
+    this.gate = new UniversalHardeningGate(environment, currentPolicyVersion, promotionEvidenceVerifier);
   }
   definitions(): readonly SovereignDefinition[] { return Object.freeze(Object.values(FOUR_SOVEREIGNS)); }
   authorizeAction(source: SovereignId, action: SovereignAction): FabricDecision {
