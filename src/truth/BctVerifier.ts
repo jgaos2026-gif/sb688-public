@@ -375,8 +375,8 @@ export class BctVerifier {
         try {
           this.ledger.append({
             traceId: `bct:${input.identity}`,
-            from: "bct.registry",
-            to: "bct.identity",
+            from: "bct.transaction",
+            to: "bct.audit",
             status: "failed",
             at,
             detail: { trusted: false, failedLayers, finalHash,
