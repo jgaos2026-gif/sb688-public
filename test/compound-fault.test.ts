@@ -12,7 +12,7 @@ import assert from "node:assert/strict";
 import { AuditLedger } from "../src/ledger/AuditLedger";
 import { PhoenixRecovery } from "../src/phoenix/PhoenixRecovery";
 import { TriadCoordinator } from "../src/triad/TriadCoordinator";
-import { BctVerifier, computeBraidSignature } from "../src/truth/BctVerifier";
+import { BctVerifier, computeBraidBindingHash } from "../src/truth/BctVerifier";
 import { TrustStateMachine, IllegalTrustTransitionError } from "../src/trust/TrustStateMachine";
 import { hashOf } from "../src/utils/hash";
 import { fixedClock } from "../src/utils/time";
@@ -27,14 +27,15 @@ function makeVerifier(): BctVerifier {
 
 function validBctInput(overrides: Partial<Parameters<BctVerifier["verify"]>[0]> = {}) {
   const declaredHash = hashOf(SEED);
-  const braidSignature = computeBraidSignature(declaredHash, SPINE_SIG);
+  const braidBindingHash = computeBraidBindingHash(declaredHash, SPINE_SIG);
   return {
     identity: "SB689-NODE",
     state: SEED,
     declaredHash,
-    braidSignature,
+    braidBindingHash,
     spineSignature: SPINE_SIG,
     priorAuditHash: "GENESIS",
+    allowGenesis: true,
     requiredKeys: ["protocol", "version", "owner", "bricks"] as readonly string[],
     ...overrides,
   };
@@ -141,7 +142,7 @@ test("compound: verifier disagreement — two fields wrong, one correct — over
   // Two faults simultaneously: wrong declared hash AND wrong braid signature
   const result = v.verify(validBctInput({
     declaredHash: "sha256:WRONG_HASH_FAULT_1",
-    braidSignature: "sha256:WRONG_SIG_FAULT_2",
+    braidBindingHash: "sha256:WRONG_SIG_FAULT_2",
   }));
 
   const cryptoLayer = result.layers.find((l) => l.layer === "crypto");
@@ -210,7 +211,7 @@ test("compound-3-fault: wrong hash + wrong sig + injected extra key — ALL thre
   // Fault 1 + 2 via BctVerifier: wrong hash + wrong sig
   const result = v.verify(validBctInput({
     declaredHash: "sha256:FAULT_1_WRONG_HASH",
-    braidSignature: "sha256:FAULT_2_FORGED_SIG",
+    braidBindingHash: "sha256:FAULT_2_FORGED_SIG",
   }));
   const failedLayers = result.layers.filter((l) => !l.passed);
   assert.ok(failedLayers.length >= 2, "At least two layers must fail for two faults");
