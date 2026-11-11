@@ -140,3 +140,84 @@ test("rejoin review remains locked during post-recovery healthy-beat probation",
     assert.equal(d.rejoinReviewAllowed, false);
   }
 });
+
+
+test("rejected heartbeat persists quarantine until separately governed recovery", () => {
+  const g = new SovereignHeartbeatGovernor("SOVEREIGN_1", "constitution-v1");
+  g.observe(beat(1, 10_000));
+  const rejected = g.observe(beat(1, 20_000));
+  assert.equal(rejected.accepted, false);
+  assert.equal(rejected.quarantineRequested, true);
+
+  let latest = rejected;
+  for (let sequence = 2; sequence <= 7; sequence++) {
+    latest = g.observe(beat(sequence, sequence * 10_000));
+  }
+  assert.equal(latest.consecutiveHealthyBeats, 6);
+  assert.equal(latest.quarantineRequested, true);
+  assert.equal(latest.trustPromotionFrozen, true);
+  assert.equal(latest.rejoinReviewAllowed, false);
+
+  assert.equal(g.acknowledgeGovernedRecovery("NODE_1", "SECTION_A1", {
+    verified: true, validated: true, certified: true,
+    checkpointPresent: true, evidencePreserved: true
+  }), true);
+
+  for (let sequence = 8; sequence <= 13; sequence++) {
+    latest = g.observe(beat(sequence, sequence * 10_000));
+  }
+  assert.equal(latest.consecutiveHealthyBeats, 6);
+  assert.equal(latest.quarantineRequested, false);
+  assert.equal(latest.trustPromotionFrozen, false);
+  assert.equal(latest.rejoinReviewAllowed, true);
+});
+
+test("non-finite heartbeat timestamps fail closed and persist quarantine", () => {
+  const g = new SovereignHeartbeatGovernor("SOVEREIGN_1", "constitution-v1");
+  const d = g.observe(beat(1, 10_000, {
+    emittedAtMs: Number.NaN,
+    receivedAtMs: Number.NaN
+  }));
+  assert.equal(d.accepted, false);
+  assert.equal(d.quarantineRequested, true);
+  assert.ok(d.reasons.includes("heartbeat timestamps must be finite non-negative numbers"));
+
+  const next = g.observe(beat(1, 10_000));
+  assert.equal(next.accepted, true);
+  assert.equal(next.quarantineRequested, true);
+  assert.equal(next.trustPromotionFrozen, true);
+});
+
+test("malformed heartbeat object is rejected without throwing", () => {
+  const g = new SovereignHeartbeatGovernor("SOVEREIGN_1", "constitution-v1");
+  const d = g.observe(null as unknown as SovereignHeartbeat);
+  assert.equal(d.accepted, false);
+  assert.equal(d.quarantineRequested, true);
+  assert.equal(d.trustPromotionFrozen, true);
+});
+
+test("heartbeat policy rejects invalid or inverted escalation thresholds", () => {
+  assert.throws(() => new SovereignHeartbeatGovernor(
+    "SOVEREIGN_1", "constitution-v1",
+    { ...SUPER_HARD_HEARTBEAT_POLICY, basePulseMs: 0 }
+  ));
+  assert.throws(() => new SovereignHeartbeatGovernor(
+    "SOVEREIGN_1", "constitution-v1",
+    {
+      ...SUPER_HARD_HEARTBEAT_POLICY,
+      trustFreezeAfterMissedBeats: 3,
+      quarantineAfterMissedBeats: 2
+    }
+  ));
+});
+
+test("governed recovery acknowledgement rejects malformed evidence safely", () => {
+  const g = new SovereignHeartbeatGovernor("SOVEREIGN_1", "constitution-v1");
+  g.observe(beat(1, 10_000));
+  assert.equal(g.acknowledgeGovernedRecovery(
+    "NODE_1", "SECTION_A1", null as unknown as {
+      verified: boolean; validated: boolean; certified: boolean;
+      checkpointPresent: boolean; evidencePreserved: boolean;
+    }
+  ), false);
+});
