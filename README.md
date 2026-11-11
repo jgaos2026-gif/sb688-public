@@ -85,3 +85,8 @@ This branch integrates the previously separate Sovereign hardening work with the
 ### Operational boundary
 
 These modules do not create a self-starting production daemon by themselves. A deployment still needs a supervisor/scheduler to invoke heartbeat and patrol cycles, persistent storage for state and evidence, real independent verifier services, key custody, monitoring/alert delivery, and a configured action policy. The campaign results are test-harness evidence, not external penetration testing or production certification.
+
+
+## Public architecture alignment
+
+**System status** is determined by executable health checks and preserved evidence, not by labels in documentation. The **triple braid** describes independent verification paths and must be measured in each deployment. The **spine proxy** is the only permitted boundary for governed state changes. See [`STITCH_BRIDGE.md`](STITCH_BRIDGE.md) for the `stitch_bridge.md` lifecycle and integration contract.
