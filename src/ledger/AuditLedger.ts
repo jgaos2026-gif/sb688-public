@@ -1,9 +1,17 @@
 import * as fs from "node:fs";
+import { createHash } from "node:crypto";
 import * as path from "node:path";
 import type { AuditEntry, AuditTransition } from "../contracts/audit";
 import { hashOf } from "../utils/hash";
 import { deepCloneValue, deepFreezeValue } from "../utils/deep";
 import { acquireFileLock, releaseFileLock, type FileLockHandle } from "../utils/fileLock";
+
+export interface LedgerAnchor {
+  readonly recordCount: number;
+  readonly headHash: string;
+  readonly wholeFileDigest: string;
+  readonly anchoredAt: string;
+}
 
 export interface AuditLedgerOptions {
   /**
@@ -143,6 +151,41 @@ export class AuditLedger {
 
   verifyChain(): boolean {
     return AuditLedger.entriesChainValid(this.store);
+  }
+
+  /**
+   * Capture a durable integrity anchor. When file-backed, synchronize under
+   * the cross-process writer lock so the anchor includes every acknowledged
+   * append and refuses a divergent or corrupt on-disk chain.
+   */
+  computeAnchor(clock: () => string = () => new Date().toISOString()): LedgerAnchor {
+    const lock = this.filePath ? this.acquireLock() : undefined;
+    try {
+      if (this.filePath) this.syncWithFileLocked();
+      if (!this.verifyChain()) {
+        throw new Error("LEDGER_ANCHOR_REFUSED: audit chain failed verification.");
+      }
+      const jsonLines = this.entriesJsonLines();
+      return Object.freeze({
+        recordCount: this.store.length,
+        headHash: this.latestHash(),
+        wholeFileDigest: createHash("sha256").update(jsonLines, "utf8").digest("hex"),
+        anchoredAt: clock()
+      });
+    } finally {
+      if (lock) releaseFileLock(lock);
+    }
+  }
+
+  verifyAnchor(anchor: LedgerAnchor): boolean {
+    try {
+      const current = this.computeAnchor(() => anchor.anchoredAt);
+      return current.recordCount === anchor.recordCount &&
+        current.headHash === anchor.headHash &&
+        current.wholeFileDigest === anchor.wholeFileDigest;
+    } catch {
+      return false;
+    }
   }
 
   private static entriesChainValid(entries: readonly AuditEntry[]): boolean {
