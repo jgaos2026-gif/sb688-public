@@ -1,12 +1,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { timingSafeEqual } from "node:crypto";
 import { IntegratedSystem } from "../system/IntegratedSystem";
 import { SpineGovernor } from "../spine/SpineGovernor";
 import { LiquidTruthNodeMesh } from "../truth/LiquidTruthNodeMesh";
 import { loadSpineKeysFromEnv } from "../truth/SpinePermitCrypto";
 import type { UserIntent } from "../contracts/runtime";
 import { AgentBrick } from "../agent/AgentBrick";
-import { readServerRuntimeConfig } from "./config";
+import { readServerRuntimeConfig, type ServerRuntimeConfig } from "./config";
+import { isOperatorAuthorized } from "./operatorAuth";
 import { logServerEvent } from "./logger";
 
 export interface SystemServerOptions {
@@ -31,7 +31,7 @@ export function startSystemServer(options: SystemServerOptions = {}): void {
 
   const server = createServer(async (request, response) => {
     try {
-      await routeRequest(system, agent, spineGate, request, response, config.uploadMaxBodyBytes, startedAtMs, config.environment);
+      await routeRequest(system, agent, spineGate, request, response, config, startedAtMs);
     } catch (error) {
       logServerEvent("error", "request.unhandled", {
         message: error instanceof Error ? error.message : "unknown",
@@ -61,12 +61,18 @@ async function routeRequest(
   spineGate: SpineGateRuntime | null,
   request: IncomingMessage,
   response: ServerResponse,
-  uploadMaxBodyBytes: number,
-  startedAtMs: number,
-  environment: "development" | "staging" | "production"
+  config: ServerRuntimeConfig,
+  startedAtMs: number
 ): Promise<void> {
   const method = request.method ?? "GET";
   const url = request.url ?? "/";
+
+  const publicApi = url === "/api/health" || url === "/api/ready" || url === "/api/truth/pre-brain";
+  if (config.requireOperatorAuth && url.startsWith("/api/") && !publicApi &&
+      !isOperatorAuthorized(request.headers.authorization, config.operatorToken)) {
+    sendJson(response, 401, { ok: false, error: "Operator authentication required." });
+    return;
+  }
 
   if (method === "GET" && url === "/") {
     sendHtml(response, INDEX_HTML);
@@ -87,7 +93,7 @@ async function routeRequest(
     sendJson(response, 200, {
       ok: true,
       service: "SB689 complete system",
-      environment,
+      environment: config.environment,
       uptimeSeconds: Math.floor((Date.now() - startedAtMs) / 1000),
       status: system.status().status,
       ledgerValid: system.ledgerValid()
@@ -299,7 +305,7 @@ async function routeRequest(
   }
 
   if (method === "POST" && url === "/api/upload") {
-    const body = await readJsonBodyWithLimit(request, uploadMaxBodyBytes);
+    const body = await readJsonBodyWithLimit(request, config.uploadMaxBodyBytes);
     if (body === null) {
       sendJson(response, 413, { ok: false, error: "Request body too large." });
       return;
@@ -323,7 +329,7 @@ async function routeRequest(
   }
 
   if (method === "POST" && url === "/api/upload/dispatch") {
-    const body = await readJsonBodyWithLimit(request, uploadMaxBodyBytes);
+    const body = await readJsonBodyWithLimit(request, config.uploadMaxBodyBytes);
     if (body === null) {
       sendJson(response, 413, { ok: false, error: "Request body too large." });
       return;
