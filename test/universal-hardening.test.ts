@@ -56,7 +56,7 @@ test("promotion rejects truthy strings, policy drift, and missing human approval
   assert.equal(hardening.authorizePromotion(evidence({
     policyVersion: "v1"
   })).state, "QUARANTINED");
-  assert.equal(gate.authorizePromotion(evidence({
+  assert.equal(hardening.authorizePromotion(evidence({
     policyVersion: "v2",
     humanApprovedCriticalChange: undefined
   })).state, "QUARANTINED");
