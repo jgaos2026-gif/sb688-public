@@ -16,7 +16,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AuditLedger } from "../src/ledger/AuditLedger";
 import { PhoenixRecovery } from "../src/phoenix/PhoenixRecovery";
-import { BctVerifier, computeBraidSignature } from "../src/truth/BctVerifier";
+import { BctVerifier, computeBraidBindingHash } from "../src/truth/BctVerifier";
 import { TriadCoordinator } from "../src/triad/TriadCoordinator";
 import { hashOf } from "../src/utils/hash";
 import { fixedClock } from "../src/utils/time";
@@ -34,14 +34,15 @@ function makeVerifier(): BctVerifier {
 
 function validInput(overrides: Partial<Parameters<BctVerifier["verify"]>[0]> = {}) {
   const declaredHash = hashOf(SEED);
-  const braidSignature = computeBraidSignature(declaredHash, SPINE_SIG);
+  const braidBindingHash = computeBraidBindingHash(declaredHash, SPINE_SIG);
   return {
     identity: "SB689-NODE",
     state: SEED,
     declaredHash,
-    braidSignature,
+    braidBindingHash,
     spineSignature: SPINE_SIG,
     priorAuditHash: "GENESIS",
+    allowGenesis: true,
     requiredKeys: ["protocol", "version", "owner", "bricks"] as readonly string[],
     ...overrides,
   };
@@ -153,7 +154,7 @@ test("negative-control: wrong declared hash causes crypto layer to fail", () => 
 test("negative-control: wrong braid signature causes braid layer to fail", () => {
   const v = makeVerifier();
   const result = v.verify(validInput({
-    braidSignature: "sha256:FORGED_SIGNATURE_NEGATIVE_CONTROL",
+    braidBindingHash: "sha256:FORGED_SIGNATURE_NEGATIVE_CONTROL",
   }));
   const braidLayer = result.layers.find((l) => l.layer === "braid");
   assert.ok(braidLayer, "braid layer must be present in result");
@@ -174,14 +175,15 @@ test("negative-control: missing required schema key causes schema layer to fail"
   const v = makeVerifier();
   const badState = { version: 1, owner: "JGA" } as Record<string, unknown>; // missing "protocol"
   const declaredHash = hashOf(badState);
-  const braidSignature = computeBraidSignature(declaredHash, SPINE_SIG);
+  const braidBindingHash = computeBraidBindingHash(declaredHash, SPINE_SIG);
   const result = v.verify({
     identity: "SB689-NODE",
     state: badState,
     declaredHash,
-    braidSignature,
+    braidBindingHash,
     spineSignature: SPINE_SIG,
     priorAuditHash: "GENESIS",
+    allowGenesis: true,
     requiredKeys: ["protocol", "version", "owner"],
   });
   const schemaLayer = result.layers.find((l) => l.layer === "schema");
