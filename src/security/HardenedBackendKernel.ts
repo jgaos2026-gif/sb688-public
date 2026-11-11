@@ -13,7 +13,7 @@ export type BackendOperation = "HEALTH" | "READY" | "READ_LEDGER" | "RUN_INTENT"
 
 export interface BackendRequest<T = unknown> {
   readonly operation: BackendOperation;
-  /** Must be set by the trusted transport adapter after real authentication, never from request JSON. */
+  /** Untrusted legacy field. Ignored by the kernel; authentication comes from BackendAuthenticator. */
   readonly tokenValid: boolean;
   readonly sourceId?: string;
   readonly provenanceId?: string;
@@ -28,6 +28,16 @@ export interface BackendRequest<T = unknown> {
   readonly evidenceRef?: string;
   readonly payload?: T;
 }
+
+export interface TrustedBackendIdentity {
+  readonly authenticated: boolean;
+  readonly sourceId?: string;
+  readonly provenanceId?: string;
+}
+
+/** Must validate credentials outside the request body and return a trusted principal. */
+export type BackendAuthenticator = (request: BackendRequest) =>
+  TrustedBackendIdentity | Promise<TrustedBackendIdentity>;
 
 export interface BackendAdapter {
   health(): unknown;
@@ -66,7 +76,8 @@ export class HardenedBackendKernel {
     private readonly adapter: BackendAdapter,
     environment: EnvironmentId = "GENERAL",
     private readonly currentPolicyVersion = "v1",
-    promotionEvidenceVerifier?: PromotionEvidenceVerifier
+    promotionEvidenceVerifier?: PromotionEvidenceVerifier,
+    private readonly authenticateRequest: BackendAuthenticator = () => ({ authenticated: false })
   ) {
     if (!adapter || typeof adapter !== "object" || !currentPolicyVersion.trim()) {
       throw new Error("trusted backend adapter and current policy version are required");
@@ -84,14 +95,21 @@ export class HardenedBackendKernel {
       return blocked(404, "ACCESS", ["unsupported backend operation"]);
     }
     const route = ROUTES[request.operation];
+    let identity: TrustedBackendIdentity;
+    try {
+      identity = await this.authenticateRequest(request);
+    } catch {
+      identity = { authenticated: false };
+    }
+    if (!identity || typeof identity !== "object") identity = { authenticated: false };
     const accessContext: OperatorRequestContext = {
       method: route.method,
       path: route.path,
       bodyBytes: request.bodyBytes,
       contentType: request.contentType,
-      tokenValid: request.tokenValid,
-      sourceId: request.sourceId,
-      provenanceId: request.provenanceId,
+      tokenValid: identity.authenticated === true,
+      sourceId: identity.sourceId,
+      provenanceId: identity.provenanceId,
       declaredPolicyVersion: request.policyVersion,
       currentPolicyVersion: this.currentPolicyVersion,
       humanApprovedCriticalChange: request.humanApprovedCriticalChange,
