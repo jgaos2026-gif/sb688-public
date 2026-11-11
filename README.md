@@ -90,3 +90,6 @@ These modules do not create a self-starting production daemon by themselves. A d
 ## Public architecture alignment
 
 **System status** is determined by executable health checks and preserved evidence, not by labels in documentation. The **triple braid** describes independent verification paths and must be measured in each deployment. The **spine proxy** is the only permitted boundary for governed state changes. See [`STITCH_BRIDGE.md`](STITCH_BRIDGE.md) for the `stitch_bridge.md` lifecycle and integration contract.
+
+
+**Heartbeat persistence limitation:** `SovereignHeartbeatGovernor` currently keeps per-node sequence, probation, freeze, and quarantine state in process memory. A process restart resets that state. Production autonomous recovery must first add durable, integrity-checked state replay (for example, from the file-backed AuditLedger) and verify it across restarts; the heartbeat class alone is not a production watchdog.
