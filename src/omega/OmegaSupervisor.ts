@@ -89,7 +89,7 @@ export class OmegaSupervisor {
 
     // 1) Verify_Stitch
     if (!this.stitch.verify()) {
-      this.crown.red("Stitch signature invalid.", "Connect_To_Stitch");
+      this.crown.red("Local Stitch binding hash invalid.", "Connect_To_Stitch");
       this.audit("omega.stitch.invalid", { cycle: this.cycle });
       return this.resurrect("BRICK_C_ARMOR", "Stitch verification failed.", args.liveState);
     }

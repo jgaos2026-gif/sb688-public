@@ -69,3 +69,11 @@ export function isValidOperatorAuthorization(header: string | undefined, expecte
   const expected = Buffer.from(expectedToken, "utf8");
   return supplied.length === expected.length && timingSafeEqual(supplied, expected);
 }
+
+export function requiresOperatorAuthorization(method: string, url: string, required: boolean): boolean {
+  if (!required || !url.startsWith("/api/")) return false;
+  if (method === "GET" && (url === "/api/health" || url === "/api/ready")) return false;
+  // This endpoint has its own independent service-to-service bearer secret.
+  if (method === "POST" && url === "/api/truth/pre-brain") return false;
+  return true;
+}

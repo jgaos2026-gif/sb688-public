@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { isValidOperatorAuthorization, readServerRuntimeConfig } from "../src/server/config";
+import { isValidOperatorAuthorization, readServerRuntimeConfig, requiresOperatorAuthorization } from "../src/server/config";
 
 const token = "sovereign-operator-token-with-more-than-32-characters";
 
@@ -43,4 +43,14 @@ test("operator bearer authentication is exact and constant-time compared", () =>
   assert.equal(isValidOperatorAuthorization("Bearer wrong", token), false);
   assert.equal(isValidOperatorAuthorization(undefined, token), false);
   assert.equal(isValidOperatorAuthorization(`Bearer ${token}`, "short"), false);
+});
+
+
+test("public probes and the separately authenticated SB688 service route are scoped correctly", () => {
+  assert.equal(requiresOperatorAuthorization("GET", "/api/health", true), false);
+  assert.equal(requiresOperatorAuthorization("GET", "/api/ready", true), false);
+  assert.equal(requiresOperatorAuthorization("POST", "/api/truth/pre-brain", true), false);
+  assert.equal(requiresOperatorAuthorization("POST", "/api/runtime/run", true), true);
+  assert.equal(requiresOperatorAuthorization("GET", "/api/ledger", true), true);
+  assert.equal(requiresOperatorAuthorization("POST", "/api/agent/configure", false), false);
 });

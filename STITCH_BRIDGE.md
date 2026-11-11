@@ -48,3 +48,25 @@ internals or giving direct access to the spine.
 | Triple Braid | Truth convergence across independent paths |
 | Spine Proxy | Verified intermediary between braid and spine |
 | Mirror / Ledger / Heartbeat | Observation, traceability, and recovery |
+
+
+## SB688 local Stitch status boundary
+
+The SB688 OMEGA four-brick manifest is a local content-binding check. Its
+SHA-256 value is **not** a cryptographic signature, peer identity, or
+Universal Braid certification. A local manifest check cannot establish a
+remote session.
+
+Until the Universal Braid transport, peer identity exchange, signed
+challenge-response, freshness/replay checks, heartbeat, disconnect seal,
+Phoenix recovery, and independent Triad certification are implemented and
+verified, `POST /api/omega/connect` reports `OFFLINE` /
+`NOT_GRANTED` (HTTP 503). This is intentional fail-closed behavior, not a
+failed local manifest check.
+
+When the SB688 server is in production/staging or bound to a non-loopback
+address, all API routes other than minimal health/readiness probes and the
+separately authenticated `/api/truth/pre-brain` endpoint require
+`Authorization: Bearer $SB688_OPERATOR_TOKEN`. The operator token must be
+at least 32 characters and must be supplied through the deployment secret
+manager, never committed to source.
