@@ -70,7 +70,7 @@ export class HardenedBackendKernel {
       throw new Error("trusted backend adapter and current policy version are required");
     }
     this.hardening = new UniversalHardeningGate(environment, currentPolicyVersion);
-    this.sovereigns = new FourSovereignFabric(environment);
+    this.sovereigns = new FourSovereignFabric(environment, currentPolicyVersion);
   }
 
   async handle(request: BackendRequest): Promise<BackendResponse> {
