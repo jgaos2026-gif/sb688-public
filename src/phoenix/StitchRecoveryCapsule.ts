@@ -15,6 +15,9 @@ export interface StitchCapsule {
 export interface RecoveryResult {
   readonly success: boolean;
   readonly state: Readonly<Record<string, unknown>>;
+  /** Preserve the trust boundary between pre-programmed Stitch controls and memory. */
+  readonly stitchState: Readonly<Record<string, unknown>>;
+  readonly memoryState: Readonly<Record<string, unknown>>;
   readonly discardedLiveKeys: number;
   readonly trusted: false;
   readonly requiresHealthyScan: true;
@@ -109,6 +112,8 @@ export class StitchRecoveryCapsule {
       return Object.freeze({
         success: true,
         state,
+        stitchState: Object.freeze({ ...stitch }),
+        memoryState: Object.freeze({ ...memory }),
         discardedLiveKeys,
         trusted: false,
         requiresHealthyScan: true,
@@ -118,6 +123,8 @@ export class StitchRecoveryCapsule {
       return Object.freeze({
         success: false,
         state: Object.freeze({}),
+        stitchState: Object.freeze({}),
+        memoryState: Object.freeze({}),
         discardedLiveKeys,
         trusted: false,
         requiresHealthyScan: true,
@@ -133,14 +140,20 @@ export class StitchRecoveryCapsule {
    * produce a replacement capsule.
    */
   static renewAfterHealthyScan(
-    recoveredState: Readonly<Record<string, unknown>>,
+    recovery: RecoveryResult,
     scan: HealthyScanResult,
-    memoryState: Readonly<Record<string, unknown>> = {}
+    memoryUpdates: Readonly<Record<string, unknown>> = {}
   ): StitchCapsule | null {
-    if (!scan.healthy || !scan.verified || !scan.validated || scan.corruptionDetected) {
+    if (!recovery.success || !scan.healthy || !scan.verified ||
+        !scan.validated || scan.corruptionDetected) {
       return null;
     }
-    return this.seal(recoveredState, memoryState);
+    // Keep Stitch controls immutable while allowing verified memory values
+    // to advance. Memory can never overwrite a key owned by Stitch.
+    return this.seal(recovery.stitchState, {
+      ...recovery.memoryState,
+      ...memoryUpdates
+    });
   }
 
   private static isUsable(value: unknown): boolean {
