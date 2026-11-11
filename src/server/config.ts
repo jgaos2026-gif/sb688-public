@@ -1,3 +1,4 @@
+import { timingSafeEqual } from "node:crypto";
 export interface ServerRuntimeConfig {
   readonly environment: "development" | "staging" | "production";
   readonly host: string;
@@ -13,12 +14,14 @@ const DEFAULTS: ServerRuntimeConfig = Object.freeze({
   host: "127.0.0.1",
   port: 6890,
   uploadMaxBodyBytes: 11 * 1024 * 1024,
-  gracefulShutdownTimeoutMs: 10_000
+  gracefulShutdownTimeoutMs: 10_000,
+  requireOperatorAuth: false,
+  operatorToken: ""
 });
 
 export function readServerRuntimeConfig(
   env: NodeJS.ProcessEnv,
-  override: Partial<Omit<ServerRuntimeConfig, "environment">> = {}
+  override: Partial<Pick<ServerRuntimeConfig, "host" | "port" | "uploadMaxBodyBytes" | "gracefulShutdownTimeoutMs">> = {}
 ): ServerRuntimeConfig {
   const environment = normalizeEnvironment(env["SB689_ENV"]);
   return Object.freeze({
@@ -64,5 +67,5 @@ export function isValidOperatorAuthorization(header: string | undefined, expecte
   if (typeof header !== "string" || !header.startsWith("Bearer ") || expectedToken.length < 32) return false;
   const supplied = Buffer.from(header.slice(7), "utf8");
   const expected = Buffer.from(expectedToken, "utf8");
-  return supplied.length === expected.length && require("node:crypto").timingSafeEqual(supplied, expected);
+  return supplied.length === expected.length && timingSafeEqual(supplied, expected);
 }

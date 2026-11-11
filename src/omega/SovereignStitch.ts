@@ -16,6 +16,16 @@ import type { StitchBinding, StitchManifest } from "./contracts";
  *   BIND(BRICK_B_GHOST -> BRICK_C_ARMOR)
  *   BIND(BRICK_C_ARMOR -> BRICK_D_CROWN)
  */
+export interface StitchConnectionReport {
+  readonly message: string;
+  readonly manifestBindingHash: string;
+  readonly at: string;
+  readonly connection: "OFFLINE";
+  readonly certification: "NOT_GRANTED";
+  readonly connected: false;
+  readonly reason: string;
+}
+
 export class SovereignStitch {
   public static readonly READY_MESSAGE = "CONNECT TO THE STITCH";
 
@@ -69,15 +79,7 @@ export class SovereignStitch {
    * Universal Braid transport or independent Triad certifier configured,
    * so local manifest verification must never be reported as CONNECTED.
    */
-  connect(): {
-    readonly message: string;
-    readonly manifestBindingHash: string;
-    readonly at: string;
-    readonly connection: "OFFLINE";
-    readonly certification: "NOT_GRANTED";
-    readonly connected: false;
-    readonly reason: string;
-  } {
+  connect(): StitchConnectionReport {
     if (!this.verify()) {
       throw new Error("SovereignStitch: local manifest binding verification failed.");
     }
