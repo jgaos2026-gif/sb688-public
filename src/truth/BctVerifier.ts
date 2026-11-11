@@ -12,7 +12,11 @@ import { systemClock } from "../utils/time";
  *   2. Schema verification     — state conforms to required structure
  *   3. Cryptographic verification — hash integrity matches declared hash
  *   4. Braid verification      — braid signature binds state to governance chain
- *   5. Transaction verification — the transition is logically consistent
+ *   5. Transaction verification — the transition itself is valid: the new
+ *      state's hash must be chained to the prior state's hash, and a no-op
+ *      transition (new hash equals prior hash) is never certified as a new
+ *      state. Allowed transitions are genesis (no prior hash) or a chained
+ *      transition to a different state.
  *   6. Audit verification      — the audit ledger chain is intact
  *
  * No state becomes trusted without passing ALL six layers.
@@ -35,6 +39,14 @@ export interface BctVerificationInput {
   readonly requiredKeys?: readonly string[];
   /** Optional prior state hash for transaction consistency. */
   readonly priorStateHash?: string;
+  /**
+   * Hash binding the new state to the prior state, computed as
+   * hashOf({ stateHash: declaredHash, priorStateHash }).
+   * Required when priorStateHash is present and not "GENESIS": without it
+   * the verifier cannot establish that this transition follows from that
+   * prior state, and the transition is rejected.
+   */
+  readonly transitionHash?: string;
 }
 
 export interface BctLayerResult {
@@ -175,22 +187,54 @@ export class BctVerifier {
   }
 
   private layerTransaction(input: BctVerificationInput): BctLayerResult {
-    if (!input.priorStateHash) {
+    if (!input.priorStateHash || input.priorStateHash === "GENESIS") {
       // No prior hash — first transaction in the chain; always allowed.
       return { layer: "transaction", passed: true, message: "Genesis transaction — no prior hash required." };
     }
-    // The transition is valid if the declared hash differs from the prior hash
-    // (state must have changed) OR if they are equal (idempotent transition is acceptable).
-    // The key invariant is that the prior hash must itself be a valid sha256 hash.
-    const priorWellFormed = input.priorStateHash.startsWith("sha256:") || input.priorStateHash === "GENESIS";
-    const passed = priorWellFormed;
+    // The prior hash must itself be a valid sha256 hash. A format check alone
+    // never certifies a transition — the rules below must all pass as well.
+    const priorWellFormed = input.priorStateHash.startsWith("sha256:");
+    if (!priorWellFormed) {
+      return {
+        layer: "transaction",
+        passed: false,
+        message: "Prior state hash is malformed — transaction chain broken.",
+        detail: { priorStateHash: input.priorStateHash }
+      };
+    }
+    // A no-op transition (new state hash equals prior state hash) is not a
+    // new state and must never be certified as one.
+    if (input.declaredHash === input.priorStateHash) {
+      return {
+        layer: "transaction",
+        passed: false,
+        message: "No-op transition — new state hash equals prior state hash; not a new state.",
+        detail: { priorStateHash: input.priorStateHash, declaredHash: input.declaredHash }
+      };
+    }
+    // The transition itself must be proven: the caller supplies the transition
+    // hash chaining the new state's hash to the prior state's hash. A
+    // declared hash that is merely well-formed, or a prior hash that merely
+    // exists, proves nothing about this transition.
+    const expectedTransitionHash = computeTransitionHash(input.declaredHash, input.priorStateHash);
+    const chained = input.transitionHash === expectedTransitionHash;
+    if (!chained) {
+      return {
+        layer: "transaction",
+        passed: false,
+        message: "Transition hash does not bind the new state to the prior state — unchained transition rejected.",
+        detail: {
+          priorStateHash: input.priorStateHash,
+          declaredHash: input.declaredHash,
+          expectedTransitionHash
+        }
+      };
+    }
     return {
       layer: "transaction",
-      passed,
-      message: passed
-        ? "Transaction is logically consistent with prior state."
-        : "Prior state hash is malformed — transaction chain broken.",
-      detail: { priorStateHash: input.priorStateHash }
+      passed: true,
+      message: "Transition is chained to the prior state and changes state.",
+      detail: { priorStateHash: input.priorStateHash, transitionHash: input.transitionHash }
     };
   }
 
@@ -215,4 +259,14 @@ export class BctVerifier {
 /** Helper: compute the canonical braid signature for use with BctVerifier. */
 export function computeBraidSignature(stateHash: string, spineSignature: string): string {
   return hashOf({ stateHash, spineSignature });
+}
+
+/**
+ * Helper: compute the canonical transition hash binding a new state's hash
+ * to its prior state's hash. A transition is only accepted when the caller
+ * supplies this exact value — it is the proof that the new state follows
+ * from the declared prior state, not from any other state.
+ */
+export function computeTransitionHash(stateHash: string, priorStateHash: string): string {
+  return hashOf({ stateHash, priorStateHash });
 }

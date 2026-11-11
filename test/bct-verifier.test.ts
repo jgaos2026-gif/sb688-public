@@ -7,7 +7,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { AuditLedger } from "../src/ledger/AuditLedger";
-import { BctVerifier, computeBraidSignature } from "../src/truth/BctVerifier";
+import { BctVerifier, computeBraidSignature, computeTransitionHash } from "../src/truth/BctVerifier";
 import { hashOf } from "../src/utils/hash";
 import { fixedClock } from "../src/utils/time";
 
@@ -95,9 +95,55 @@ test("bct: transaction layer passes for genesis (no prior hash)", () => {
   assert.equal(txLayer.passed, true);
 });
 
-test("bct: transaction layer passes for valid prior state hash", () => {
+test("bct: transaction layer passes for a chained transition to a new state", () => {
   const { v } = makeVerifier();
+  const declaredHash = hashOf(STATE);
+  const priorStateHash = hashOf({ prev: "state" });
+  const result = v.verify(validInput({
+    priorStateHash,
+    transitionHash: computeTransitionHash(declaredHash, priorStateHash)
+  }));
+
+  const txLayer = result.layers.find((l) => l.layer === "transaction")!;
+  assert.equal(txLayer.passed, true);
+});
+
+test("bct: transaction layer fails for an unchained transition (no transition hash)", () => {
+  const { v } = makeVerifier();
+  // A well-formed prior hash alone proves nothing about this transition.
   const result = v.verify(validInput({ priorStateHash: hashOf({ prev: "state" }) }));
+
+  assert.equal(result.trusted, false);
+  assert.ok(result.failedLayers.includes("transaction"));
+});
+
+test("bct: transaction layer fails for a wrong transition hash", () => {
+  const { v } = makeVerifier();
+  const priorStateHash = hashOf({ prev: "state" });
+  const result = v.verify(validInput({
+    priorStateHash,
+    transitionHash: computeTransitionHash(hashOf({ other: "state" }), priorStateHash)
+  }));
+
+  assert.equal(result.trusted, false);
+  assert.ok(result.failedLayers.includes("transaction"));
+});
+
+test("bct: transaction layer fails for a no-op transition (new hash equals prior hash)", () => {
+  const { v } = makeVerifier();
+  const declaredHash = hashOf(STATE);
+  const result = v.verify(validInput({
+    priorStateHash: declaredHash,
+    transitionHash: computeTransitionHash(declaredHash, declaredHash)
+  }));
+
+  assert.equal(result.trusted, false);
+  assert.ok(result.failedLayers.includes("transaction"));
+});
+
+test("bct: transaction layer passes for GENESIS prior hash", () => {
+  const { v } = makeVerifier();
+  const result = v.verify(validInput({ priorStateHash: "GENESIS" }));
 
   const txLayer = result.layers.find((l) => l.layer === "transaction")!;
   assert.equal(txLayer.passed, true);
