@@ -4,6 +4,7 @@ export * from "./contracts/runtime";
 export * from "./ledger/AuditLedger";
 export * from "./spine/SpineGovernor";
 export * from "./truth/LiquidTruthNodeMesh";
+export * from "./truth/SpinePermitCrypto";
 export * from "./conscious/ConsciousBrick";
 export * from "./stem/DecisionRouter";
 export * from "./stem/MemoryRouter";

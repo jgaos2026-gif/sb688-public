@@ -31,6 +31,8 @@ function validInput(overrides: Partial<Parameters<BctVerifier["verify"]>[0]> = {
     spineSignature: SPINE_SIG,
     priorAuditHash: "GENESIS",
     requiredKeys: ["protocol", "version", "owner"],
+    // Genesis transitions need explicit authorization (finding 15).
+    allowGenesis: true,
     ...overrides
   };
 }
@@ -99,6 +101,8 @@ test("bct: transaction layer passes for a chained transition to a new state", ()
   const { v } = makeVerifier();
   const declaredHash = hashOf(STATE);
   const priorStateHash = hashOf({ prev: "state" });
+  // Finding 15: the prior must be the REGISTERED head for this identity.
+  v.registerHead("intent-001", priorStateHash);
   const result = v.verify(validInput({
     priorStateHash,
     transitionHash: computeTransitionHash(declaredHash, priorStateHash)
@@ -219,7 +223,8 @@ test("bct: multiple independent states each produce distinct final hashes", () =
     declaredHash: hashA,
     braidSignature: computeBraidSignature(hashA, SPINE_SIG),
     spineSignature: SPINE_SIG,
-    priorAuditHash: "GENESIS"
+    priorAuditHash: "GENESIS",
+    allowGenesis: true
   });
 
   const r2 = v.verify({
@@ -228,7 +233,8 @@ test("bct: multiple independent states each produce distinct final hashes", () =
     declaredHash: hashB,
     braidSignature: computeBraidSignature(hashB, SPINE_SIG),
     spineSignature: SPINE_SIG,
-    priorAuditHash: r1.auditHash
+    priorAuditHash: r1.auditHash,
+    allowGenesis: true
   });
 
   assert.notEqual(r1.finalHash, r2.finalHash);

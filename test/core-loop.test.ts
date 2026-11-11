@@ -17,6 +17,8 @@ test("core loop enforces ordered SB689 execution and checkpoints verified output
   assert.equal(ledger.verifyChain(), true);
 
   const transitions = ledger.entries().map((entry) => `${entry.from}->${entry.to}`);
+  // Finding 03: brain->truth.post is recorded TWICE — "started" before
+  // post-brain verification runs, "passed" only after it succeeds.
   assert.deepEqual(transitions, [
     "intent->spine",
     "spine->truth.pre",
@@ -24,8 +26,11 @@ test("core loop enforces ordered SB689 execution and checkpoints verified output
     "conscious-brick->stem",
     "stem->brain",
     "brain->truth.post",
+    "brain->truth.post",
     "truth.post->ghost-node",
     "ghost-node->ledger",
     "ledger->response"
   ]);
+  const postBrain = ledger.entries().filter((e) => e.from === "brain" && e.to === "truth.post");
+  assert.deepEqual(postBrain.map((e) => e.status), ["started", "passed"]);
 });

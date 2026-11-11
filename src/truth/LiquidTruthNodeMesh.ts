@@ -1,3 +1,4 @@
+import type { KeyObject } from "node:crypto";
 import type { Result } from "../contracts/result";
 import { err, ok } from "../contracts/result";
 import type {
@@ -10,15 +11,43 @@ import type {
 } from "../contracts/runtime";
 import { QuantumDistributionValidator } from "../quantum/QuantumDistributionValidator";
 import { hashOf } from "../utils/hash";
+import type { Clock } from "../utils/time";
+import { systemClock } from "../utils/time";
+import { verifySpinePermitSignature } from "./SpinePermitCrypto";
+
+export interface LiquidTruthNodeMeshOptions {
+  /**
+   * TRUSTED spine public key permits verify against. FAIL CLOSED: when
+   * no key is configured, the signature finding FAILS — an unverifiable
+   * permit is never trusted on the strength of a hash prefix. The
+   * BraidedRuntime wires this from its SpineGovernor by default.
+   */
+  readonly publicKey?: KeyObject | string;
+  /** Clock for expiry checks. Defaults to the system clock. */
+  readonly clock?: Clock;
+}
 
 export class LiquidTruthNodeMesh {
   private readonly quantum: QuantumDistributionValidator;
+  private readonly publicKey?: KeyObject | string;
+  private readonly clock: Clock;
+  /** Signatures already accepted — a permit may verify exactly once. */
+  private readonly seenPermitSignatures = new Set<string>();
 
-  constructor(quantum = new QuantumDistributionValidator()) {
+  constructor(quantum = new QuantumDistributionValidator(), options: LiquidTruthNodeMeshOptions = {}) {
     this.quantum = quantum;
+    this.publicKey = options.publicKey;
+    this.clock = options.clock ?? systemClock;
   }
 
   validatePreBrain(intent: UserIntent, permit: SpinePermit): Result<TruthReport> {
+    const signatureCheck = this.checkPermitSignature(permit);
+    const freshnessCheck = this.checkPermitFreshness(permit);
+    const replayCheck =
+      typeof permit.signature === "string" && this.seenPermitSignatures.has(permit.signature)
+        ? { passed: false, message: "Spine permit signature has already been used — replay rejected." }
+        : { passed: true, message: "Spine permit has not been seen before." };
+
     const findings: TruthFinding[] = [
       {
         nodeId: "truth.intent.integrity",
@@ -28,9 +57,21 @@ export class LiquidTruthNodeMesh {
       },
       {
         nodeId: "truth.spine.signature",
-        passed: permit.approved === true && permit.spineSignature.startsWith("sha256:"),
+        passed: signatureCheck.passed,
         confidence: 0.98,
-        message: "Spine permit is signed and approved."
+        message: signatureCheck.message
+      },
+      {
+        nodeId: "truth.spine.freshness",
+        passed: freshnessCheck.passed,
+        confidence: 0.97,
+        message: freshnessCheck.message
+      },
+      {
+        nodeId: "truth.spine.replay",
+        passed: replayCheck.passed,
+        confidence: 0.97,
+        message: replayCheck.message
       },
       {
         nodeId: "truth.constraints.present",
@@ -40,7 +81,72 @@ export class LiquidTruthNodeMesh {
       }
     ];
 
-    return this.report("pre-brain", findings);
+    const result = this.report("pre-brain", findings);
+    // Only a permit that fully verified is marked seen — a failed
+    // attempt must not burn a legitimate permit's one use.
+    if (result.ok && typeof permit.signature === "string") {
+      this.seenPermitSignatures.add(permit.signature);
+    }
+    return result;
+  }
+
+  /**
+   * REAL signature check (finding 02): Ed25519 `crypto.verify` over the
+   * canonical permit contents against the trusted public key. The old
+   * `sha256:` prefix check is gone — a hash prefix is not a signature
+   * and is never accepted as one.
+   */
+  private checkPermitSignature(permit: SpinePermit): { passed: boolean; message: string } {
+    if (permit.approved !== true) {
+      return { passed: false, message: "Spine permit is not approved." };
+    }
+    if (!this.publicKey) {
+      return {
+        passed: false,
+        message: "No trusted spine public key is configured — permit signature cannot be verified (fail closed)."
+      };
+    }
+    if (
+      typeof permit.signature !== "string" ||
+      typeof permit.issuer !== "string" ||
+      typeof permit.issuedAt !== "string" ||
+      typeof permit.expiresAt !== "string" ||
+      typeof permit.nonce !== "string"
+    ) {
+      return { passed: false, message: "Spine permit is missing signature fields (signature/issuer/issuedAt/expiresAt/nonce)." };
+    }
+    const verified = verifySpinePermitSignature(
+      {
+        intentId: permit.intentId,
+        constraints: permit.constraints,
+        issuer: permit.issuer,
+        issuedAt: permit.issuedAt,
+        expiresAt: permit.expiresAt,
+        nonce: permit.nonce
+      },
+      permit.signature,
+      this.publicKey
+    );
+    return { passed: verified.ok, message: verified.reason };
+  }
+
+  private checkPermitFreshness(permit: SpinePermit): { passed: boolean; message: string } {
+    if (typeof permit.issuedAt !== "string" || typeof permit.expiresAt !== "string") {
+      return { passed: false, message: "Spine permit carries no issue/expiry timestamps." };
+    }
+    const nowMs = Date.parse(this.clock());
+    const issuedMs = Date.parse(permit.issuedAt);
+    const expiresMs = Date.parse(permit.expiresAt);
+    if (Number.isNaN(issuedMs) || Number.isNaN(expiresMs) || Number.isNaN(nowMs)) {
+      return { passed: false, message: "Spine permit timestamps are unparseable." };
+    }
+    if (nowMs < issuedMs) {
+      return { passed: false, message: "Spine permit is not yet valid (issued in the future)." };
+    }
+    if (nowMs >= expiresMs) {
+      return { passed: false, message: "Spine permit has expired." };
+    }
+    return { passed: true, message: "Spine permit is within its validity window." };
   }
 
   validatePostBrain(output: BrainOutput, packet: StemPacket): Result<TruthReport> {

@@ -11,6 +11,23 @@ export interface SpinePermit {
   readonly approved: true;
   readonly constraints: readonly string[];
   readonly spineSignature: string;
+  /**
+   * Ed25519 signature (base64) over the canonical permit contents —
+   * see src/truth/SpinePermitCrypto.ts. A permit without a signature
+   * that verifies against a trusted public key is NOT trusted.
+   * The old `spineSignature` sha256 binding is kept for determinism
+   * and backwards compatibility; it is a content hash, not a signature,
+   * and proves nothing about who issued the permit.
+   */
+  readonly signature?: string;
+  /** Issuer identifier (key id / operator name). */
+  readonly issuer?: string;
+  /** ISO timestamp the permit was issued. */
+  readonly issuedAt?: string;
+  /** ISO timestamp after which the permit is dead. */
+  readonly expiresAt?: string;
+  /** Per-permit random nonce — makes every signature unique. */
+  readonly nonce?: string;
 }
 
 export interface TruthFinding {
@@ -108,4 +125,18 @@ export interface RuntimeSnapshot {
   readonly stage: RuntimeStage;
   readonly auditHash: string;
   readonly stable: boolean;
+  /**
+   * Last-stable captured state of each rollback participant, with the
+   * hash of the captured state recorded at capture time. The
+   * FailureManager restores from these captures and verifies the
+   * restored hash matches — that is what makes a rollback demonstrable
+   * rather than claimed.
+   */
+  readonly participantStates?: Readonly<Record<string, RollbackParticipantState>>;
+}
+
+/** One participant's captured state plus its hash at capture time. */
+export interface RollbackParticipantState {
+  readonly captured: unknown;
+  readonly hash: string;
 }

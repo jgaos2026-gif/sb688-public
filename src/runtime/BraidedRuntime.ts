@@ -22,6 +22,14 @@ export interface BraidedRuntimeDeps {
   readonly brain?: BrainAdapter;
   readonly ghost?: GhostNode;
   readonly clock?: Clock;
+  /**
+   * Mutable components whose state a failure may need to roll back.
+   * Passed through to the FailureManager; see its RollbackParticipant
+   * contract. Empty by default — the runtime's own components today
+   * (ledger, ghost checkpoints) are append-only audit records and are
+   * never erased by a rollback, so there is nothing to restore here.
+   */
+  readonly rollbackParticipants?: readonly import("../failure/FailureManager").RollbackParticipant[];
 }
 
 export class BraidedRuntime {
@@ -33,16 +41,21 @@ export class BraidedRuntime {
   private readonly brain: BrainAdapter;
   private readonly ghost: GhostNode;
   private readonly clock: Clock;
+  private readonly rollbackParticipants: readonly import("../failure/FailureManager").RollbackParticipant[];
 
   constructor(deps: BraidedRuntimeDeps) {
     this.ledger = deps.ledger;
-    this.spine = deps.spine ?? new SpineGovernor();
-    this.truth = deps.truth ?? new LiquidTruthNodeMesh();
+    this.clock = deps.clock ?? systemClock;
+    // The mesh verifies permits against THIS governor's public key, so a
+    // permit signed by any other key (or by nobody) fails pre-brain.
+    // A caller-injected truth mesh is responsible for its own key.
+    this.spine = deps.spine ?? new SpineGovernor(undefined, { clock: this.clock });
+    this.truth = deps.truth ?? new LiquidTruthNodeMesh(undefined, { publicKey: this.spine.spinePublicKey, clock: this.clock });
     this.conscious = deps.conscious ?? new ConsciousBrick();
     this.stem = deps.stem ?? new StemTriBraid();
     this.brain = deps.brain ?? new DefaultBrainAdapter();
-    this.clock = deps.clock ?? systemClock;
     this.ghost = deps.ghost ?? new GhostNode(this.clock);
+    this.rollbackParticipants = deps.rollbackParticipants ?? [];
   }
 
   async run(intent: UserIntent): Promise<RuntimeResponse> {
@@ -78,12 +91,18 @@ export class BraidedRuntime {
 
       currentStage = "brain";
       const brainOutput = await this.brain.speak({ intent: { id: intent.id, text: intent.text }, stem: stem.value });
-      this.transition(traceId, "brain", "truth.post", "passed", { usedStemSignature: brainOutput.usedStemSignature });
+      // Finding 03: the brain->truth.post transition is recorded as
+      // "started" BEFORE verification runs. "passed" is recorded only
+      // after validatePostBrain succeeds (below); a rejection records
+      // "failed" in the catch block. A rejected check must never leave
+      // a "passed" entry behind.
+      this.transition(traceId, "brain", "truth.post", "started", { usedStemSignature: brainOutput.usedStemSignature });
       lastStableSnapshot = this.snapshot(traceId, intent, "brain", true);
 
       currentStage = "truth.post";
       const postTruth = this.truth.validatePostBrain(brainOutput, stem.value);
       if (!postTruth.ok) throw postTruth.error;
+      this.transition(traceId, "brain", "truth.post", "passed", { meshSignature: postTruth.value.meshSignature, confidence: postTruth.value.confidence });
       this.transition(traceId, "truth.post", "ghost-node", "passed", { meshSignature: postTruth.value.meshSignature, confidence: postTruth.value.confidence });
       lastStableSnapshot = this.snapshot(traceId, intent, "truth.post", true);
 
@@ -123,7 +142,15 @@ export class BraidedRuntime {
       };
     } catch (cause) {
       const error = this.toRuntimeError(cause, currentStage);
-      const failure = new FailureManager(this.ledger, this.truth, this.ghost, this.clock);
+      // Finding 03 (rejection side): if the post-brain check itself
+      // failed, the brain->truth.post transition that was recorded as
+      // "started" is closed as "failed" — never "passed".
+      if (currentStage === "truth.post") {
+        this.transition(traceId, "brain", "truth.post", "failed", { code: error.code, message: error.message });
+      }
+      const failure = new FailureManager(this.ledger, this.truth, this.ghost, this.clock, {
+        rollbackParticipants: this.rollbackParticipants
+      });
       return failure.recover({ traceId, intent, error, currentStage, lastStableSnapshot });
     }
   }
@@ -146,12 +173,20 @@ export class BraidedRuntime {
   }
 
   private snapshot(traceId: string, intent: UserIntent, stage: RuntimeStage, stable: boolean): RuntimeSnapshot {
+    const participantStates: Record<string, { captured: unknown; hash: string }> = {};
+    for (const participant of this.rollbackParticipants) {
+      participantStates[participant.name] = {
+        captured: participant.captureState(),
+        hash: participant.stateHash()
+      };
+    }
     return {
       traceId,
       intent,
       stage,
       auditHash: this.ledger.latestHash(),
-      stable
+      stable,
+      participantStates
     };
   }
 
