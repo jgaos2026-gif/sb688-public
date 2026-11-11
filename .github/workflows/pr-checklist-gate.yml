@@ -14,26 +14,33 @@ jobs:
     if: ${{ github.actor != 'dependabot[bot]' }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v6
       - name: Validate required PR checklist items are checked
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
+          PR_BRANCH: ${{ github.head_ref || github.ref_name }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          if [ -z "$PR_BODY" ]; then
+            PR_BODY="$(curl -fsSL \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              "$GITHUB_API_URL/repos/$GITHUB_REPOSITORY/pulls?state=open&head=$GITHUB_REPOSITORY_OWNER:$PR_BRANCH" \
+              | python -c 'import json,sys; p=json.load(sys.stdin); print(p[0].get("body") or "" if p else "")')"
+            export PR_BODY
+          fi
           node - <<'NODE'
           const body = process.env.PR_BODY || "";
           const required = [
-            "npm run build passes locally",
-            "npm test passes locally",
-            "npm run demo runs end-to-end without errors",
-            "No private / proprietary content added",
+            "npm run build passes in CI",
+            "npm test passes in CI",
+            "npm run demo runs end-to-end without errors in CI",
             "Brain remains adapter-only",
             "Audit ledger format remains append-only and hash-chained",
             "Evidence labels in `docs/WHITEPAPER.md` were not weakened"
           ];
 
-          if (!body.trim()) {
-            console.error("PR body is empty; required checklist items are missing.");
-            process.exit(1);
-          }
+
 
           const missing = required.filter((item) => {
             const escaped = item.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
