@@ -35,14 +35,14 @@ test("environment profiles all require evidence-bound promotion", () => { for (c
 test("malformed artifacts and non-finite measurements fail closed", () => {
   const hardening = gate("AI_AGENT");
   assert.equal(hardening.inspect(null as unknown as ArtifactCandidate).state, "QUARANTINED");
-  assert.equal(gate.inspect(candidate({ sizeBytes: Number.NaN })).state, "QUARANTINED");
-  assert.equal(gate.inspect(candidate({ observedAtMs: Number.NaN })).state, "QUARANTINED");
-  assert.equal(gate.inspect(candidate({ evidenceIntact: undefined })).state, "QUARANTINED");
+  assert.equal(hardening.inspect(candidate({ sizeBytes: Number.NaN })).state, "QUARANTINED");
+  assert.equal(hardening.inspect(candidate({ observedAtMs: Number.NaN })).state, "QUARANTINED");
+  assert.equal(hardening.inspect(candidate({ evidenceIntact: undefined })).state, "QUARANTINED");
 });
 
 test("malformed threat signals fail closed instead of throwing", () => {
-  const gate = gate("AI_AGENT");
-  const result = gate.inspect(candidate(), [null as unknown as ReturnType<typeof signal>]);
+  const hardening = gate("AI_AGENT");
+  const result = hardening.inspect(candidate(), [null as unknown as ReturnType<typeof signal>]);
   assert.equal(result.state, "QUARANTINED");
   assert.ok(result.reasons.includes("malformed threat signal"));
 });
@@ -53,7 +53,7 @@ test("promotion rejects truthy strings, policy drift, and missing human approval
     verified: "true" as unknown as boolean,
     policyVersion: "v2"
   })).state, "QUARANTINED");
-  assert.equal(gate.authorizePromotion(evidence({
+  assert.equal(hardening.authorizePromotion(evidence({
     policyVersion: "v1"
   })).state, "QUARANTINED");
   assert.equal(gate.authorizePromotion(evidence({
@@ -64,6 +64,6 @@ test("promotion rejects truthy strings, policy drift, and missing human approval
 
 test("malformed promotion evidence and invalid environment fail closed", () => {
   const hardening = gate("GENERAL");
-  assert.equal(gate.authorizePromotion(null as unknown as PromotionEvidence).state, "QUARANTINED");
+  assert.equal(hardening.authorizePromotion(null as unknown as PromotionEvidence).state, "QUARANTINED");
   assert.throws(() => gate("NOT_A_REAL_ENV" as EnvironmentId));
 });
