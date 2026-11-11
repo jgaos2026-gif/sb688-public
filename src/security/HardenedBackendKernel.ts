@@ -12,6 +12,7 @@ export type BackendOperation = "HEALTH" | "READY" | "READ_LEDGER" | "RUN_INTENT"
 
 export interface BackendRequest<T = unknown> {
   readonly operation: BackendOperation;
+  /** Must be set by the trusted transport adapter after real authentication, never from request JSON. */
   readonly tokenValid: boolean;
   readonly sourceId?: string;
   readonly provenanceId?: string;
@@ -60,13 +61,24 @@ export class HardenedBackendKernel {
   private readonly hardening: UniversalHardeningGate;
   private readonly sovereigns: FourSovereignFabric;
 
-  constructor(private readonly adapter: BackendAdapter, environment: EnvironmentId = "GENERAL") {
+  constructor(
+    private readonly adapter: BackendAdapter,
+    environment: EnvironmentId = "GENERAL",
+    private readonly currentPolicyVersion = "v1"
+  ) {
+    if (!adapter || typeof adapter !== "object" || !currentPolicyVersion.trim()) {
+      throw new Error("trusted backend adapter and current policy version are required");
+    }
     this.hardening = new UniversalHardeningGate(environment);
     this.sovereigns = new FourSovereignFabric(environment);
   }
 
   async handle(request: BackendRequest): Promise<BackendResponse> {
+    if (request === null || typeof request !== "object") {
+      return blocked(400, "ACCESS", ["backend request must be an object"]);
+    }
     const route = ROUTES[request.operation];
+    if (!route) return blocked(404, "ACCESS", ["unsupported backend operation"]);
     const accessContext: OperatorRequestContext = {
       method: route.method,
       path: route.path,
@@ -76,7 +88,7 @@ export class HardenedBackendKernel {
       sourceId: request.sourceId,
       provenanceId: request.provenanceId,
       declaredPolicyVersion: request.policyVersion,
-      currentPolicyVersion: request.artifact?.currentPolicyVersion ?? request.policyVersion,
+      currentPolicyVersion: this.currentPolicyVersion,
       humanApprovedCriticalChange: request.humanApprovedCriticalChange,
       checkpointId: request.checkpointId,
       evidenceRef: request.evidenceRef
@@ -88,8 +100,20 @@ export class HardenedBackendKernel {
     if (request.operation === "READY") return executed(this.adapter.ready());
     if (request.operation === "READ_LEDGER") return executed(this.adapter.readLedger());
 
-    if (!request.artifact) return blocked(403, "PURIFICATION", ["artifact envelope required for state-changing operation"]);
-    const purification = this.hardening.inspect(request.artifact, request.signals ?? []);
+    if (!request.artifact || typeof request.artifact !== "object") {
+      return blocked(403, "PURIFICATION", ["artifact envelope required for state-changing operation"]);
+    }
+    if (request.artifact.declaredPolicyVersion !== request.policyVersion) {
+      return blocked(403, "PURIFICATION", ["request and artifact policy declarations differ"]);
+    }
+    if (request.signals !== undefined && !Array.isArray(request.signals)) {
+      return blocked(400, "PURIFICATION", ["threat signals must be an array"]);
+    }
+    const trustedArtifact: ArtifactCandidate = {
+      ...request.artifact,
+      currentPolicyVersion: this.currentPolicyVersion
+    };
+    const purification = this.hardening.inspect(trustedArtifact, request.signals ?? []);
     if (purification.state !== "PURIFIED_CANDIDATE") return blocked(403, "PURIFICATION", purification.reasons);
 
     if (request.operation === "CONNECT_STITCH") {
