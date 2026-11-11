@@ -77,8 +77,11 @@ export class HardenedBackendKernel {
     if (request === null || typeof request !== "object") {
       return blocked(400, "ACCESS", ["backend request must be an object"]);
     }
+    if (typeof request.operation !== "string" ||
+        !Object.prototype.hasOwnProperty.call(ROUTES, request.operation)) {
+      return blocked(404, "ACCESS", ["unsupported backend operation"]);
+    }
     const route = ROUTES[request.operation];
-    if (!route) return blocked(404, "ACCESS", ["unsupported backend operation"]);
     const accessContext: OperatorRequestContext = {
       method: route.method,
       path: route.path,
