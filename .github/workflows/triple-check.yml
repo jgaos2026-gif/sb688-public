@@ -1,6 +1,8 @@
 name: triple-check
 
 on:
+  push:
+    branches: [copilot/sb688-public-master-hardened]
   pull_request:
     branches: [main]
   workflow_dispatch:
