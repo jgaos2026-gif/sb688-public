@@ -1,5 +1,10 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { timingSafeEqual } from "node:crypto";
 import { IntegratedSystem } from "../system/IntegratedSystem";
+import { SpineGovernor } from "../spine/SpineGovernor";
+import { LiquidTruthNodeMesh } from "../truth/LiquidTruthNodeMesh";
+import { loadSpineKeysFromEnv } from "../truth/SpinePermitCrypto";
+import type { UserIntent } from "../contracts/runtime";
 import { AgentBrick } from "../agent/AgentBrick";
 import { readServerRuntimeConfig } from "./config";
 import { logServerEvent } from "./logger";
@@ -21,11 +26,12 @@ export function startSystemServer(options: SystemServerOptions = {}): void {
   });
   const system = new IntegratedSystem({ seedState: options.seedState });
   const agent = new AgentBrick();
+  const spineGate = createSpineGateFromEnv();
   const startedAtMs = Date.now();
 
   const server = createServer(async (request, response) => {
     try {
-      await routeRequest(system, agent, request, response, config.uploadMaxBodyBytes, startedAtMs, config.environment);
+      await routeRequest(system, agent, spineGate, request, response, config.uploadMaxBodyBytes, startedAtMs, config.environment);
     } catch (error) {
       logServerEvent("error", "request.unhandled", {
         message: error instanceof Error ? error.message : "unknown",
@@ -52,6 +58,7 @@ export function startSystemServer(options: SystemServerOptions = {}): void {
 async function routeRequest(
   system: IntegratedSystem,
   agent: AgentBrick,
+  spineGate: SpineGateRuntime | null,
   request: IncomingMessage,
   response: ServerResponse,
   uploadMaxBodyBytes: number,
@@ -137,6 +144,65 @@ async function routeRequest(
 
   if (method === "POST" && url === "/api/omega/connect") {
     sendJson(response, 200, { ok: true, handshake: system.connectToStitch() });
+    return;
+  }
+
+  if (method === "POST" && url === "/api/truth/pre-brain") {
+    if (!spineGate) {
+      sendJson(response, 503, {
+        ok: false,
+        error: "SB688 pre-brain gate is disabled: durable signing keys, replay store path, and shared secret are required."
+      });
+      return;
+    }
+    const authorization = request.headers.authorization ?? "";
+    const supplied = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
+    const suppliedBytes = Buffer.from(supplied, "utf8");
+    const expectedBytes = Buffer.from(spineGate.sharedSecret, "utf8");
+    if (suppliedBytes.length !== expectedBytes.length ||
+        !timingSafeEqual(suppliedBytes, expectedBytes)) {
+      sendJson(response, 401, { ok: false, error: "Unauthorized service caller." });
+      return;
+    }
+    const body = await readJsonBody(request);
+    const id = typeof body.id === "string" ? body.id.trim() : "";
+    const text = typeof body.text === "string" ? body.text.trim() : "";
+    if (!id || !text || text.length > 12_000) {
+      sendJson(response, 400, { ok: false, error: "Valid intent id and text (max 12000 characters) are required." });
+      return;
+    }
+    const intent: UserIntent = {
+      id,
+      text,
+      metadata: asRecord(body.metadata)
+    };
+    const permit = spineGate.spine.govern(intent);
+    if (!permit.ok) {
+      sendJson(response, 422, {
+        ok: false,
+        stage: "spine",
+        error: permit.error.message,
+        code: permit.error.code
+      });
+      return;
+    }
+    const truth = spineGate.truth.validatePreBrain(intent, permit.value);
+    if (!truth.ok) {
+      sendJson(response, 422, {
+        ok: false,
+        stage: "truth.pre",
+        error: truth.error.message,
+        code: truth.error.code
+      });
+      return;
+    }
+    sendJson(response, 200, {
+      ok: true,
+      intentId: id,
+      spine: { approved: true, keyProvenance: spineGate.spine.keyProvenance },
+      truth: { verified: truth.value.verified, meshSignature: truth.value.meshSignature },
+      permit: { issuer: permit.value.issuer, expiresAt: permit.value.expiresAt, nonce: permit.value.nonce }
+    });
     return;
   }
 
@@ -284,6 +350,35 @@ async function routeRequest(
   }
 
   sendJson(response, 404, { ok: false, error: "Not found" });
+}
+
+interface SpineGateRuntime {
+  readonly spine: SpineGovernor;
+  readonly truth: LiquidTruthNodeMesh;
+  readonly sharedSecret: string;
+}
+
+function createSpineGateFromEnv(): SpineGateRuntime | null {
+  const sharedSecret = process.env.SB688_GATE_SHARED_SECRET ?? "";
+  const replayStorePath = process.env.SB688_PERMIT_REPLAY_STORE_PATH ?? "";
+  if (sharedSecret.length < 32 || !replayStorePath) return null;
+  try {
+    const keys = loadSpineKeysFromEnv();
+    if (!keys.privateKey || !keys.publicKey) return null;
+    const spine = new SpineGovernor(undefined, {
+      signingKey: keys.privateKey,
+      requireDurableKey: true
+    });
+    const truth = new LiquidTruthNodeMesh(undefined, {
+      publicKey: keys.publicKey,
+      replayStorePath
+    });
+    return { spine, truth, sharedSecret };
+  } catch {
+    // Misconfigured keys or replay persistence disable the endpoint.
+    // Never fall back to ephemeral keys for a cross-service trust boundary.
+    return null;
+  }
 }
 
 async function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>> {
